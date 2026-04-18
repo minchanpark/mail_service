@@ -1,5 +1,5 @@
-import { InboxApp } from "@/components/inbox/inbox-app";
+import { InboxPage } from "@/views/inbox/inbox-page";
 
 export default function HomePage() {
-  return <InboxApp />;
+  return <InboxPage />;
 }

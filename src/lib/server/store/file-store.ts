@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { compactAppStateForStorage } from "@/lib/shared/thread-persistence";
 import { createSeedState } from "@/lib/server/store/seed";
 import type { AppState } from "@/lib/shared/types";
 
@@ -25,7 +26,8 @@ export async function readState(): Promise<AppState> {
 
 export async function writeState(nextState: AppState) {
   await ensureStateFile();
-  await writeFile(dataPath, JSON.stringify(nextState, null, 2), "utf8");
+  const compactedState = compactAppStateForStorage(nextState);
+  await writeFile(dataPath, JSON.stringify(compactedState, null, 2), "utf8");
 }
 
 export async function mutateState<T>(mutator: (draft: AppState) => Promise<T> | T): Promise<T> {

@@ -17,6 +17,9 @@ export type ProviderId = "mock" | "gmail" | "outlook" | "naver" | "custom-imap";
 export type AccountProvider = "gmail" | "outlook" | "naver" | "custom-imap" | "mock";
 export type AccountStatus = "active" | "reauth_needed" | "disconnected";
 export type SummaryStatus = "pending" | "ready" | "failed";
+export type ThreadDirection = "received" | "sent";
+export type ComposeMode = "compose" | "reply" | "forward";
+export type DraftTone = "concise" | "helpful" | "formal";
 
 export interface User {
   id: string;
@@ -69,6 +72,9 @@ export interface Thread {
   accountId: string;
   from: string;
   fromEmail: string;
+  to?: string[];
+  cc?: string[];
+  bcc?: string[];
   subject: string;
   preview: string;
   receivedAt: string;
@@ -76,6 +82,10 @@ export interface Thread {
   starred: boolean;
   archived: boolean;
   snoozedUntil?: string | null;
+  direction?: ThreadDirection;
+  sentMode?: ComposeMode | null;
+  sourceThreadId?: string | null;
+  providerMessageId?: string;
   category: Category;
   labelIds: string[];
   attachments: Attachment[];
@@ -91,6 +101,8 @@ export interface ThreadFilter {
   category?: Category;
   labelId?: string;
   query?: string;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface Briefing {
@@ -105,6 +117,16 @@ export interface Briefing {
 
 export interface ReplyVariant {
   label: string;
+  body: string;
+}
+
+export interface MailDraftVariant {
+  label: string;
+  tone: DraftTone;
+  to: string[];
+  cc: string[];
+  bcc: string[];
+  subject: string;
   body: string;
 }
 
@@ -135,6 +157,34 @@ export interface ConnectAccountPayload {
   settings?: Record<string, string>;
 }
 
+export interface GenerateMailDraftPayload {
+  mode: ComposeMode;
+  threadId?: string;
+  accountId?: string;
+  prompt?: string;
+  subject?: string;
+  body?: string;
+}
+
+export interface SendMailPayload {
+  mode: ComposeMode;
+  accountId: string;
+  threadId?: string;
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  body: string;
+}
+
+export interface SendMailResult {
+  thread: Thread;
+  accepted: string[];
+  rejected: string[];
+  provider: AccountProvider;
+  deliverySummary: string;
+}
+
 export interface AppState {
   user: User;
   accounts: StoredAccount[];
@@ -144,4 +194,8 @@ export interface AppState {
 
 export interface ThreadListResponse {
   items: Thread[];
+  page: number;
+  pageSize: number;
+  total: number;
+  hasMore: boolean;
 }

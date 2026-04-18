@@ -13,6 +13,19 @@ function parseCategory(value: string | null): Category | undefined {
   return allowed.includes(value as Category) ? (value as Category) : undefined;
 }
 
+function parsePositiveInteger(value: string | null): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const filter: ThreadFilter = {
@@ -21,6 +34,8 @@ export async function GET(request: Request) {
     category: parseCategory(searchParams.get("category")),
     labelId: searchParams.get("labelId") ?? undefined,
     query: searchParams.get("query") ?? undefined,
+    page: parsePositiveInteger(searchParams.get("page")),
+    pageSize: parsePositiveInteger(searchParams.get("pageSize")),
   };
 
   const result = await listThreads(filter);

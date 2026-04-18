@@ -1,10 +1,16 @@
 import type {
   AccountProvider,
+  ComposeMode,
   ConnectAccountPayload,
   ProviderDescriptor,
   StoredAccount,
   Thread,
 } from "@/lib/shared/types";
+
+export interface SyncInboxOptions {
+  offset?: number;
+  limit?: number;
+}
 
 export interface PreparedAccount {
   provider: AccountProvider;
@@ -14,8 +20,27 @@ export interface PreparedAccount {
   settings?: Record<string, string>;
 }
 
+export interface SendMailInput {
+  account: StoredAccount;
+  mode: ComposeMode;
+  originalThread?: Thread | null;
+  to: string[];
+  cc: string[];
+  bcc: string[];
+  subject: string;
+  body: string;
+}
+
+export interface SendMailReceipt {
+  accepted: string[];
+  rejected: string[];
+  providerMessageId?: string;
+  deliverySummary: string;
+}
+
 export interface MailProviderDriver {
   descriptor: ProviderDescriptor;
   prepareAccount(input: ConnectAccountPayload): Promise<PreparedAccount>;
-  syncInbox(account: StoredAccount): Promise<Thread[]>;
+  syncInbox(account: StoredAccount, options?: SyncInboxOptions): Promise<Thread[]>;
+  sendMail(input: SendMailInput): Promise<SendMailReceipt>;
 }

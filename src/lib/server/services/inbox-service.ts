@@ -3,19 +3,31 @@ import { randomUUID } from "node:crypto";
 import { getProviderDriver, listProviderDescriptors } from "@/lib/server/providers/registry";
 import { mutateState, readState } from "@/lib/server/store/file-store";
 import {
+  classifyThread,
   createBriefing,
+  generateMailDraftVariants,
   generateReplyVariants,
   generateSummary,
 } from "@/lib/server/services/ai-service";
+import { compactThreadForStorage } from "@/lib/shared/thread-persistence";
 import type {
   Account,
   Briefing,
   ConnectAccountPayload,
+  GenerateMailDraftPayload,
+  MailDraftVariant,
   ProviderDescriptor,
+  SendMailPayload,
+  SendMailResult,
   Thread,
   ThreadFilter,
+  ThreadListResponse,
   ThreadSummary,
 } from "@/lib/shared/types";
+
+const accountBackfillTasks = new Map<string, Promise<boolean>>();
+const INITIAL_REMOTE_SYNC_BATCH = 25;
+const REMOTE_BACKFILL_BATCH = 25;
 
 function sanitizeAccount(account: {
   secrets?: Record<string, string>;
@@ -25,12 +37,22 @@ function sanitizeAccount(account: {
   return publicAccount;
 }
 
+function isSentThread(thread: Thread) {
+  return thread.direction === "sent";
+}
+
 function recalculateUnreadCounts(threads: Thread[], accountId: string) {
-  return threads.filter((thread) => thread.accountId === accountId && thread.unread && !thread.archived).length;
+  return threads.filter((thread) => thread.accountId === accountId && thread.unread && !thread.archived && !isSentThread(thread)).length;
 }
 
 function applyThreadFilter(items: Thread[], filter: ThreadFilter) {
   let next = [...items];
+
+  if (filter.kind === "sent") {
+    next = next.filter((item) => isSentThread(item));
+  } else {
+    next = next.filter((item) => !isSentThread(item));
+  }
 
   if (filter.kind === "unread") {
     next = next.filter((item) => item.unread);
@@ -70,6 +92,8 @@ function applyThreadFilter(items: Thread[], filter: ThreadFilter) {
         item.subject,
         item.preview,
         item.bodyText ?? "",
+        ...(item.to ?? []),
+        ...(item.cc ?? []),
       ]
         .join(" ")
         .toLowerCase()
@@ -82,12 +106,139 @@ function applyThreadFilter(items: Thread[], filter: ThreadFilter) {
     .sort((a, b) => +new Date(b.receivedAt) - +new Date(a.receivedAt));
 }
 
+function paginateThreads(items: Thread[], filter: ThreadFilter): ThreadListResponse {
+  const total = items.length;
+
+  if (!filter.pageSize) {
+    return {
+      items,
+      page: 1,
+      pageSize: total,
+      total,
+      hasMore: false,
+    };
+  }
+
+  const page = Math.max(1, filter.page ?? 1);
+  const pageSize = Math.max(1, filter.pageSize);
+  const start = (page - 1) * pageSize;
+  const end = start + pageSize;
+
+  return {
+    items: items.slice(start, end),
+    page,
+    pageSize,
+    total,
+    hasMore: end < total,
+  };
+}
+
 function mergeThreads(current: Thread[], incoming: Thread[]) {
   const map = new Map(current.map((thread) => [thread.id, thread]));
   for (const thread of incoming) {
     map.set(thread.id, thread);
   }
   return [...map.values()];
+}
+
+function hasCompletedInitialSync(account: {
+  driverId: Account["driverId"];
+  settings?: Record<string, string>;
+}) {
+  return account.driverId === "mock" || account.settings?.initialSyncComplete === "true";
+}
+
+function buildSyncedSettings(
+  settings: Record<string, string> | undefined,
+  syncedCount: number,
+  hasMoreRemoteMessages: boolean,
+) {
+  return {
+    ...(settings ?? {}),
+    initialSyncComplete: String(!hasMoreRemoteMessages),
+    hasMoreRemoteMessages: String(hasMoreRemoteMessages),
+    syncedMessageCount: String(syncedCount),
+  };
+}
+
+function getReceivedThreadCount(threads: Thread[], accountId: string) {
+  return threads.filter((thread) => thread.accountId === accountId && !isSentThread(thread)).length;
+}
+
+function normalizeAddresses(addresses: string[] | undefined) {
+  const normalized = (addresses ?? [])
+    .map((address) => address.trim())
+    .filter(Boolean);
+
+  return [...new Set(normalized)];
+}
+
+function ensureOriginalThread(payload: SendMailPayload, thread: Thread | null) {
+  if (payload.mode !== "compose" && !thread) {
+    throw new Error("원본 메일을 찾을 수 없습니다.");
+  }
+}
+
+function createSentThread(input: {
+  account: Account & {
+    secrets?: Record<string, string>;
+    settings?: Record<string, string>;
+  };
+  originalThread: Thread | null;
+  payload: SendMailPayload;
+  accepted: string[];
+  providerMessageId?: string;
+  userName: string;
+}) {
+  const sentAt = new Date().toISOString();
+  const to = normalizeAddresses(input.payload.to);
+  const cc = normalizeAddresses(input.payload.cc);
+  const bcc = normalizeAddresses(input.payload.bcc);
+  const preview = input.payload.body.trim().replace(/\s+/g, " ").slice(0, 160) || input.payload.subject;
+  const category = input.originalThread?.category ?? classifyThread({
+    fromEmail: to[0] ?? input.account.email,
+    subject: input.payload.subject,
+    preview,
+  });
+
+  const baseThread: Thread = {
+    id: `sent-${randomUUID()}`,
+    userId: input.account.userId,
+    accountId: input.account.id,
+    from: input.userName,
+    fromEmail: input.account.email,
+    to,
+    cc,
+    bcc,
+    subject: input.payload.subject.trim(),
+    preview,
+    receivedAt: sentAt,
+    unread: false,
+    starred: false,
+    archived: false,
+    snoozedUntil: null,
+    direction: "sent",
+    sentMode: input.payload.mode,
+    sourceThreadId: input.originalThread?.id ?? null,
+    providerMessageId: input.providerMessageId,
+    category,
+    labelIds: input.originalThread?.labelIds ?? [],
+    attachments: [],
+    hasAction: false,
+    bodyText: input.payload.body.trim(),
+    summary: {
+      oneLine: "",
+      threeLines: [],
+      status: "pending",
+      model: "local-compose",
+      updatedAt: sentAt,
+    },
+  };
+
+  return compactThreadForStorage({
+    ...baseThread,
+    summary: generateSummary(baseThread),
+  });
 }
 
 export async function getCurrentUser() {
@@ -170,27 +321,132 @@ export async function connectAccount(payload: ConnectAccountPayload) {
     settings: prepared.settings,
   };
 
-  const syncedThreads = await driver.syncInbox(account);
+  const syncedThreads = await driver.syncInbox(account, {
+    offset: 0,
+    limit: INITIAL_REMOTE_SYNC_BATCH,
+  });
+  const syncedSettings = buildSyncedSettings(
+    account.settings,
+    syncedThreads.length,
+    syncedThreads.length === INITIAL_REMOTE_SYNC_BATCH,
+  );
 
   return mutateState((draft) => {
     draft.accounts.push({
       ...account,
+      settings: syncedSettings,
       unreadCount: recalculateUnreadCounts(syncedThreads, account.id),
     });
     draft.threads = mergeThreads(draft.threads, syncedThreads);
 
     return sanitizeAccount({
       ...account,
+      settings: syncedSettings,
       unreadCount: recalculateUnreadCounts(draft.threads, account.id),
     });
   });
 }
 
+async function backfillAccountThreads(accountId: string, limit: number) {
+  const currentTask = accountBackfillTasks.get(accountId);
+  if (currentTask) {
+    return currentTask;
+  }
+
+  const task = (async () => {
+    const state = await readState();
+    const account = state.accounts.find((candidate) => candidate.id === accountId);
+
+    if (!account || account.driverId === "mock" || account.settings?.hasMoreRemoteMessages === "false") {
+      return false;
+    }
+
+    try {
+      const driver = getProviderDriver(account.driverId);
+      const offset = getReceivedThreadCount(state.threads, accountId);
+      const syncedThreads = await driver.syncInbox(account, {
+        offset,
+        limit,
+      });
+
+      await mutateState((draft) => {
+        const accountDraft = draft.accounts.find((candidate) => candidate.id === accountId);
+        if (!accountDraft) {
+          return;
+        }
+
+        draft.threads = mergeThreads(draft.threads, syncedThreads);
+        accountDraft.lastSyncedAt = new Date().toISOString();
+        accountDraft.settings = buildSyncedSettings(
+          accountDraft.settings,
+          getReceivedThreadCount(draft.threads, accountDraft.id),
+          syncedThreads.length === limit,
+        );
+        accountDraft.unreadCount = recalculateUnreadCounts(draft.threads, accountDraft.id);
+      });
+      return syncedThreads.length > 0;
+    } catch (error) {
+      console.error(`[mail-service] remote backfill failed for account ${accountId}`, error);
+      return false;
+    }
+  })().finally(() => {
+    accountBackfillTasks.delete(accountId);
+  });
+
+  accountBackfillTasks.set(accountId, task);
+  return task;
+}
+
+async function ensureRelevantAccountsBackfilled(filter: ThreadFilter) {
+  if (filter.kind === "sent" || !filter.pageSize || !filter.page) {
+    return;
+  }
+
+  const targetCount = filter.page * filter.pageSize;
+
+  while (true) {
+    const state = await readState();
+    const currentCount = applyThreadFilter(state.threads, filter).length;
+    if (currentCount >= targetCount) {
+      return;
+    }
+
+    const relevantAccountIds = (filter.accountId
+      ? state.accounts.filter((account) => account.id === filter.accountId)
+      : state.accounts
+    )
+      .filter((account) => account.driverId !== "mock" && account.settings?.hasMoreRemoteMessages !== "false")
+      .map((account) => account.id);
+
+    if (relevantAccountIds.length === 0) {
+      return;
+    }
+
+    let progressed = false;
+
+    for (const accountId of relevantAccountIds) {
+      const didBackfill = await backfillAccountThreads(accountId, REMOTE_BACKFILL_BATCH);
+      if (didBackfill) {
+        progressed = true;
+      }
+
+      const refreshedState = await readState();
+      const refreshedCount = applyThreadFilter(refreshedState.threads, filter).length;
+      if (refreshedCount >= targetCount) {
+        return;
+      }
+    }
+
+    if (!progressed) {
+      return;
+    }
+  }
+}
+
 export async function listThreads(filter: ThreadFilter) {
+  await ensureRelevantAccountsBackfilled(filter);
   const state = await readState();
-  return {
-    items: applyThreadFilter(state.threads, filter),
-  };
+  return paginateThreads(applyThreadFilter(state.threads, filter), filter);
 }
 
 export async function getThread(threadId: string) {
@@ -244,6 +500,115 @@ export async function generateReply(threadId: string) {
   return {
     variants: generateReplyVariants(thread),
   };
+}
+
+export async function generateMailDrafts(payload: GenerateMailDraftPayload): Promise<{ variants: MailDraftVariant[] }> {
+  const state = await readState();
+  const thread = payload.threadId
+    ? state.threads.find((candidate) => candidate.id === payload.threadId) ?? null
+    : null;
+
+  if (payload.mode !== "compose" && !thread) {
+    throw new Error("원본 메일을 찾을 수 없습니다.");
+  }
+
+  return {
+    variants: generateMailDraftVariants({
+      mode: payload.mode,
+      thread,
+      prompt: payload.prompt,
+      subject: payload.subject,
+      body: payload.body,
+    }),
+  };
+}
+
+export async function sendMail(payload: SendMailPayload): Promise<SendMailResult> {
+  const state = await readState();
+  const account = state.accounts.find((candidate) => candidate.id === payload.accountId);
+
+  if (!account) {
+    throw new Error("메일 계정을 찾을 수 없습니다.");
+  }
+
+  const originalThread = payload.threadId
+    ? state.threads.find((candidate) => candidate.id === payload.threadId) ?? null
+    : null;
+
+  ensureOriginalThread(payload, originalThread);
+
+  const to = normalizeAddresses(payload.to);
+  const cc = normalizeAddresses(payload.cc);
+  const bcc = normalizeAddresses(payload.bcc);
+  const subject = payload.subject.trim();
+  const body = payload.body.trim();
+
+  if (to.length === 0) {
+    throw new Error("받는 사람 이메일이 필요합니다.");
+  }
+
+  if (!subject) {
+    throw new Error("제목을 입력해 주세요.");
+  }
+
+  if (!body) {
+    throw new Error("본문을 입력해 주세요.");
+  }
+
+  const driver = getProviderDriver(account.driverId);
+  const receipt = await driver.sendMail({
+    account,
+    mode: payload.mode,
+    originalThread,
+    to,
+    cc,
+    bcc,
+    subject,
+    body,
+  });
+
+  const sentThread = createSentThread({
+    account,
+    originalThread,
+    payload: {
+      ...payload,
+      to,
+      cc,
+      bcc,
+      subject,
+      body,
+    },
+    accepted: receipt.accepted,
+    providerMessageId: receipt.providerMessageId,
+    userName: state.user.displayName,
+  });
+
+  return mutateState((draft) => {
+    draft.threads = mergeThreads(draft.threads, [sentThread]);
+
+    const accountDraft = draft.accounts.find((candidate) => candidate.id === account.id);
+    if (accountDraft) {
+      accountDraft.lastSyncedAt = new Date().toISOString();
+      accountDraft.unreadCount = recalculateUnreadCounts(draft.threads, account.id);
+    }
+
+    if (originalThread && payload.mode === "reply") {
+      const sourceThread = draft.threads.find((candidate) => candidate.id === originalThread.id);
+      if (sourceThread) {
+        sourceThread.unread = false;
+        sourceThread.hasAction = false;
+        sourceThread.summary = generateSummary(sourceThread);
+      }
+    }
+
+    return {
+      thread: sentThread,
+      accepted: receipt.accepted,
+      rejected: receipt.rejected,
+      provider: account.provider,
+      deliverySummary: receipt.deliverySummary,
+    };
+  });
 }
 
 export async function getBriefing(): Promise<Briefing> {

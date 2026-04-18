@@ -11,7 +11,10 @@ This file applies to everything under `src/`.
 ## Directory map
 
 - `app/` : App Router entrypoints and route handlers.
-- `components/` : client-facing UI composition.
+- `components/` : thin compatibility wrappers or shared presentational composition.
+- `controllers/` : provider-style page state orchestration.
+- `services/` : browser-facing API mapping and service contexts.
+- `views/` : page-oriented UI files.
 - `lib/client/` : browser adapters, hooks, and context.
 - `lib/server/` : server-only services, providers, and storage.
 - `lib/shared/` : shared serializable types and small pure helpers.

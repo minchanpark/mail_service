@@ -1,6 +1,6 @@
 ---
 name: inbox-one-provider-driver
-description: Use when adding or changing a mail provider driver in Inbox One. Covers the provider registry, account preparation, IMAP/API normalization into the shared Thread model, secret handling, and the service boundaries that keep provider logic out of routes and UI.
+description: Use when adding or changing a mail provider driver in Inbox One. Covers the provider registry, account preparation, IMAP/API normalization into the shared Thread model, outbound send transport, secret handling, and the service boundaries that keep provider logic out of routes and UI.
 ---
 
 # Inbox One Provider Driver
@@ -19,6 +19,7 @@ description: Use when adding or changing a mail provider driver in Inbox One. Co
 - Keep connection metadata in the driver descriptor.
 - Keep credential preparation in `prepareAccount()`.
 - Normalize external payloads into the shared `Thread` model inside the driver, not in routes.
+- Keep outbound transport logic in `sendMail()` inside the driver rather than in services or routes.
 - Generate category/action/summary fields through the existing server services/helpers.
 - Register the driver in `src/lib/server/providers/registry.ts`.
 - Avoid leaking secrets into API responses, shared types, or UI state.

@@ -21,7 +21,10 @@ If you edit `src/lib/server/providers/imap/driver.ts`, read:
 ## Core rules
 
 - Keep App Router route handlers thin in `src/app/api/**`.
-- Keep browser data access inside `src/lib/client/**`.
+- Keep browser API mapping in `src/services/api/**`.
+- Keep page state orchestration in `src/controllers/**`.
+- Keep page-oriented UI in `src/views/**`.
+- Keep low-level browser hooks and reusable client helpers in `src/lib/client/**`.
 - Keep business logic in `src/lib/server/services/**`.
 - Keep provider-specific integration in `src/lib/server/providers/**`.
 - Keep persistence in `src/lib/server/store/**`.
@@ -30,6 +33,7 @@ If you edit `src/lib/server/providers/imap/driver.ts`, read:
 - Do not move provider logic into routes or components.
 - Preserve the provider registry/driver pattern when adding new mail servers.
 - Keep the file-backed demo store working unless the task explicitly replaces it.
+- When touching `src/views/**`, also read the matching controller and service `AGENTS.md` on that page path if they exist.
 
 ## Documentation rules
 
@@ -42,6 +46,7 @@ If you edit `src/lib/server/providers/imap/driver.ts`, read:
 
 - Project skills live in `.codex/skills/**`.
 - Project hooks are registered in `.codex/hooks.json` and implemented in `.codex/hooks/**`.
+- Tool-backed quality skills should keep their required npm packages and runnable scripts in sync with `package.json`.
 
 ## Validation
 

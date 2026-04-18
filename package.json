@@ -6,13 +6,20 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "security:audit": "audit-ci --moderate --report-type summary",
+    "security:retire": "retire --path . --ignore node_modules,.next,.git,.clinic,.npm-cache --severity medium",
+    "security:headers": "node ./.codex/skills/web-security-audit/scripts/check-security-headers.mjs http://localhost:3000",
+    "security:scan": "bash ./.codex/skills/web-security-audit/scripts/run-security-scan.sh",
+    "perf:network": "bash ./.codex/skills/web-network-performance/scripts/run-autocannon.sh",
+    "perf:memory": "bash ./.codex/skills/web-memory-profile/scripts/run-heap-profile.sh"
   },
   "dependencies": {
     "imapflow": "^1.3.2",
     "lucide-react": "^1.8.0",
     "mailparser": "^3.9.8",
     "next": "^16.2.4",
+    "nodemailer": "^8.0.5",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "zod": "^4.3.6"
@@ -20,8 +27,13 @@
   "devDependencies": {
     "@types/mailparser": "^3.4.6",
     "@types/node": "^25.6.0",
+    "@types/nodemailer": "^8.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "audit-ci": "^7.1.0",
+    "autocannon": "^8.0.0",
+    "clinic": "^13.0.0",
+    "retire": "^5.4.2",
     "typescript": "^6.0.3"
   }
 }
