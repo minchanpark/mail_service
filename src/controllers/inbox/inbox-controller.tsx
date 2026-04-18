@@ -19,7 +19,7 @@ import {
   useLabels,
   useThreads,
   useUpdateThread,
-} from "@/lib/client/hooks";
+} from "@/services/client/mail-hooks";
 import type {
   Account,
   Briefing,
@@ -29,9 +29,9 @@ import type {
   Thread,
   ThreadFilter,
   User,
-} from "@/lib/shared/types";
+} from "@/models";
 import { createMailApiService } from "@/services/api/mail-api-service";
-import { MailServiceProvider } from "@/services/api/mail-service-context";
+import { MailServiceProvider } from "@/services/client/mail-service-context";
 
 import type { ComposerIntent } from "@/controllers/inbox/types";
 

@@ -2,7 +2,10 @@
 
 import type { ReactNode } from "react";
 
-import type { Label } from "@/lib/shared/types";
+type LabelPillValue = {
+  color: string;
+  name: string;
+};
 
 export function formatAddressSummary(addresses: string[] | undefined, fallback = "수신자 미지정") {
   if (!addresses || addresses.length === 0) {
@@ -30,7 +33,7 @@ export function ProviderDot({ provider }: { provider: string }) {
   );
 }
 
-export function LabelPill({ label }: { label: Label }) {
+export function LabelPill({ label }: { label: LabelPillValue }) {
   return (
     <span
       style={{

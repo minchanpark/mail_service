@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { createRouteErrorResponse, requireAuthenticatedUser } from "@/lib/server/auth/session";
-import { listThreads } from "@/lib/server/services/inbox-service";
-import type { Category, ThreadFilter, ThreadView } from "@/lib/shared/types";
+import { createRouteErrorResponse, requireAuthenticatedUser } from "@/services/server/auth/session";
+import { listThreads } from "@/services/server/services/inbox-service";
+import type { Category, ThreadFilter, ThreadView } from "@/models";
 
 function parseView(value: string | null): ThreadView {
   const allowed: ThreadView[] = ["all", "unread", "needsReply", "starred", "sent", "snoozed"];

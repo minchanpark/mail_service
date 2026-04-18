@@ -1,6 +1,3 @@
-export {
-  BackendProvider,
-  MailServiceProvider,
-  useBackend,
-  useMailService,
-} from "@/services/api/mail-service-context";
+"use client";
+
+export * from "@/services/client/backend-context";

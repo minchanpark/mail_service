@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { createRouteErrorResponse, requireAuthenticatedUser } from "@/lib/server/auth/session";
-import { sendMail } from "@/lib/server/services/inbox-service";
+import { createRouteErrorResponse, requireAuthenticatedUser } from "@/services/server/auth/session";
+import { sendMail } from "@/services/server/services/inbox-service";
 
 const sendMailSchema = z
   .object({

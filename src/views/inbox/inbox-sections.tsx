@@ -31,17 +31,20 @@ import {
 } from "react";
 
 import { useInboxController } from "@/controllers/inbox/inbox-controller";
-import { useThread, useUpdateThread, useSummarizeThread, useProviderCatalog } from "@/lib/client/hooks";
-import { formatThreadDate, formatThreadTime } from "@/lib/shared/time";
+import { formatThreadDate, formatThreadTime } from "@/other/utils/time";
 import type {
   Category,
-  ComposeMode,
   ConnectAccountPayload,
-  ProviderDescriptor,
   Thread,
   ThreadView,
-} from "@/lib/shared/types";
-import { useMailService } from "@/services/api/mail-service-context";
+} from "@/models";
+import { useMailService } from "@/services/client/mail-service-context";
+import {
+  useProviderCatalog,
+  useSummarizeThread,
+  useThread,
+  useUpdateThread,
+} from "@/services/client/mail-hooks";
 
 import {
   ActionButton,

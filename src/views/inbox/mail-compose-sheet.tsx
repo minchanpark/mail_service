@@ -13,12 +13,12 @@ import {
   useGenerateMailDraft,
   useSendMail,
   useThread,
-} from "@/lib/client/hooks";
-import { formatThreadDate, formatThreadTime } from "@/lib/shared/time";
+} from "@/services/client/mail-hooks";
+import { formatThreadDate, formatThreadTime } from "@/other/utils/time";
 import type {
   ComposeMode,
   SendMailResult,
-} from "@/lib/shared/types";
+} from "@/models";
 
 import {
   Field,

@@ -4,7 +4,6 @@ This file applies to `src/lib/server/store/`.
 
 ## Rules
 
-- The current store is a file-backed demo persistence layer.
-- Preserve deterministic seed bootstrapping and safe read/write behavior.
-- Keep file-system details here, not in routes or services.
-- If the storage backend changes later, keep the service API stable while swapping implementation here.
+- Keep canonical persistence in `src/services/server/store/**`.
+- Leave only compatibility wrappers here unless the task is explicitly about old import support.
+- Preserve deterministic seed bootstrapping and safe read/write behavior in the canonical store layer.

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { createRouteErrorResponse, requireAuthenticatedUser } from "@/lib/server/auth/session";
-import { removeLabel, updateLabel } from "@/lib/server/services/inbox-service";
+import { createRouteErrorResponse, requireAuthenticatedUser } from "@/services/server/auth/session";
+import { removeLabel, updateLabel } from "@/services/server/services/inbox-service";
 
 const updateLabelSchema = z.object({
   name: z.string().min(1).optional(),

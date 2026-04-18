@@ -1,4 +1,4 @@
-import type { ComposeMode } from "@/lib/shared/types";
+import type { ComposeMode } from "@/models";
 
 export type ComposerIntent = {
   mode: ComposeMode;

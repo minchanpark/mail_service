@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { applyDemoSession, isLoopbackRequest } from "@/lib/server/auth/session";
+import { applyDemoSession, isLoopbackRequest } from "@/services/server/auth/session";
 
 function buildContentSecurityPolicy(nonce: string) {
   const isDevelopment = process.env.NODE_ENV !== "production";

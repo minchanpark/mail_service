@@ -16,7 +16,7 @@ import type {
   ThreadListResponse,
   ThreadSummary,
   User,
-} from "@/lib/shared/types";
+} from "@/models";
 
 export type ResourceKey = "auth" | "accounts" | "threads" | "labels" | "briefing" | "providers";
 
