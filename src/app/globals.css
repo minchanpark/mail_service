@@ -1,0 +1,141 @@
+:root {
+  --bg-0: #ffffff;
+  --bg-1: #f8f7f4;
+  --bg-2: #efeee8;
+  --bg-3: #e5e3da;
+  --border: #dfddd3;
+  --border-strong: #cbc8bc;
+  --fg-0: #161512;
+  --fg-1: #403c32;
+  --fg-2: #686253;
+  --fg-3: #948d7c;
+  --accent: #1d4ed8;
+  --accent-soft: #e9f0ff;
+  --accent-soft-fg: #163169;
+  --danger: #dc2626;
+  --success: #059669;
+  --shadow: 0 16px 48px rgba(15, 23, 42, 0.08);
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  --gmail: #d14b3d;
+  --outlook: #4a6fa5;
+  --naver: #1f8c43;
+  --custom-imap: #7456d8;
+  --mock: #8b5cf6;
+  --font-sans: "Pretendard Variable", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
+}
+
+[data-theme="dark"] {
+  --bg-0: #0d1017;
+  --bg-1: #121722;
+  --bg-2: #1b2231;
+  --bg-3: #273043;
+  --border: #2b3346;
+  --border-strong: #3a445b;
+  --fg-0: #f8f7f4;
+  --fg-1: #e6e2d8;
+  --fg-2: #b6af9d;
+  --fg-3: #827b69;
+  --accent: #63a0ff;
+  --accent-soft: #16243f;
+  --accent-soft-fg: #a7c9ff;
+  --danger: #f87171;
+  --success: #34d399;
+  --shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: radial-gradient(circle at top, #eef3ff 0%, var(--bg-1) 36%, var(--bg-1) 100%);
+  color: var(--fg-0);
+  font-family: var(--font-sans);
+}
+
+body {
+  min-height: 100vh;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.panel {
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+[data-theme="dark"] .panel {
+  background: rgba(12, 16, 23, 0.82);
+}
+
+.scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.scrollbar::-webkit-scrollbar-thumb {
+  background: var(--bg-3);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-up {
+  animation: fade-up 0.24s ease-out;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

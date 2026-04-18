@@ -1,0 +1,7 @@
+.next
+node_modules
+dist
+.npm-cache
+.DS_Store
+.env.local
+data/mail-service-db.json
