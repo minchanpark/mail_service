@@ -3,6 +3,9 @@ node_modules
 dist
 .npm-cache
 .DS_Store
-.env.local
-data/mail-service-db.json
-data/mail-service-db.json.bak
+.env
+.env.*
+!.env.example
+data/
+.reports/
+*.tsbuildinfo
