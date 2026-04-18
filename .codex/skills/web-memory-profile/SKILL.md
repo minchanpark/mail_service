@@ -16,9 +16,10 @@ Use this skill to reproduce and inspect memory pressure in the running service.
 ## Primary workflow
 
 1. Build the app.
-2. Run `next start` under `clinic heapprofiler`.
+2. Run `next start` under Node `--heap-prof` on a separate port.
 3. Reproduce memory pressure with `autocannon`.
-4. Inspect retained objects and then reduce payload size, cache size, or duplicated parsing.
+4. Inspect the generated `.heapprofile` file, then reduce payload size, cache size, or duplicated parsing.
+5. Use `clinic heapprofiler` only as an optional secondary tool when richer visual output is needed.
 
 ## Fast path
 
@@ -43,15 +44,21 @@ TARGET_URL='http://localhost:$PORT/api/threads?kind=all&page=8&pageSize=10' bash
 The script profiles this repo with:
 
 ```bash
-node ./node_modules/next/dist/bin/next start
+node --heap-prof ./node_modules/next/dist/bin/next start
 ```
 
 ## Quick commands
 
-Heap profile under load:
+Heap profile under load with the reliable Node fallback:
 
 ```bash
-npx clinic heapprofiler --open=false --autocannon [ -c 10 -d 15 'http://localhost:$PORT/api/threads?kind=all&page=1&pageSize=10' ] -- node ./node_modules/next/dist/bin/next start
+PORT=3200 bash ./.codex/skills/web-memory-profile/scripts/run-heap-profile.sh
+```
+
+Optional Clinic run:
+
+```bash
+USE_CLINIC=true PORT=3200 bash ./.codex/skills/web-memory-profile/scripts/run-heap-profile.sh
 ```
 
 ## Typical memory problems in this repo

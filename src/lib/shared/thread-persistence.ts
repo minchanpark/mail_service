@@ -16,6 +16,10 @@ function compactBodyText(bodyText: string | undefined) {
   return `${bodyText.slice(0, nextLength)}${BODY_TRUNCATION_NOTICE}`;
 }
 
+export function sortThreadsByReceivedAt(threads: Thread[]) {
+  return [...threads].sort((left, right) => +new Date(right.receivedAt) - +new Date(left.receivedAt));
+}
+
 export function compactThreadForStorage(thread: Thread): Thread {
   return {
     ...thread,
@@ -27,6 +31,6 @@ export function compactThreadForStorage(thread: Thread): Thread {
 export function compactAppStateForStorage(state: AppState): AppState {
   return {
     ...state,
-    threads: state.threads.map(compactThreadForStorage),
+    threads: sortThreadsByReceivedAt(state.threads).map(compactThreadForStorage),
   };
 }

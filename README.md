@@ -16,6 +16,7 @@ npm run dev
 - 보안 점검: `audit-ci`, `retire`, `.codex/skills/web-security-audit`
 - 네트워크 성능 점검: `autocannon`, `.codex/skills/web-network-performance`
 - 메모리 점검: `clinic`, `.codex/skills/web-memory-profile`
+- 메모리 점검은 기본적으로 Node `--heap-prof` + `autocannon`을 사용하고, 필요 시 `clinic`을 보조로 사용합니다.
 
 자주 쓰는 명령:
 

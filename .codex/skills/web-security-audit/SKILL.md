@@ -13,6 +13,8 @@ Use this skill when auditing the local web app for practical security issues.
 - `retire`
 - `node` built-in `fetch`
 
+By default, dependency audit runs in **runtime-focused mode** with `--skip-dev` so diagnostics from repo-local profiling tools do not drown out real production risk. Use a full-tree audit separately when you explicitly want dev-tool exposure.
+
 ## What this skill checks
 
 1. Dependency vulnerabilities from the active lockfile
@@ -37,6 +39,12 @@ BASE_URL=http://localhost:3001 bash ./.codex/skills/web-security-audit/scripts/r
 ## Individual checks
 
 Dependency audit:
+
+```bash
+npx audit-ci --moderate --skip-dev --report-type summary
+```
+
+Full dependency tree audit:
 
 ```bash
 npx audit-ci --moderate --report-type summary

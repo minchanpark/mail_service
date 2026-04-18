@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "security:audit": "audit-ci --moderate --report-type summary",
+    "security:audit": "audit-ci --moderate --skip-dev --report-type summary",
     "security:retire": "retire --path . --ignore node_modules,.next,.git,.clinic,.npm-cache --severity medium",
     "security:headers": "node ./.codex/skills/web-security-audit/scripts/check-security-headers.mjs http://localhost:3000",
     "security:scan": "bash ./.codex/skills/web-security-audit/scripts/run-security-scan.sh",

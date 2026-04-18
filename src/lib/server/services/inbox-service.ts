@@ -9,7 +9,7 @@ import {
   generateReplyVariants,
   generateSummary,
 } from "@/lib/server/services/ai-service";
-import { compactThreadForStorage } from "@/lib/shared/thread-persistence";
+import { compactThreadForStorage, sortThreadsByReceivedAt } from "@/lib/shared/thread-persistence";
 import type {
   Account,
   Briefing,
@@ -101,9 +101,7 @@ function applyThreadFilter(items: Thread[], filter: ThreadFilter) {
     );
   }
 
-  return next
-    .filter((item) => !item.archived || filter.kind === "snoozed")
-    .sort((a, b) => +new Date(b.receivedAt) - +new Date(a.receivedAt));
+  return next.filter((item) => !item.archived || filter.kind === "snoozed");
 }
 
 function paginateThreads(items: Thread[], filter: ThreadFilter): ThreadListResponse {
@@ -138,7 +136,7 @@ function mergeThreads(current: Thread[], incoming: Thread[]) {
   for (const thread of incoming) {
     map.set(thread.id, thread);
   }
-  return [...map.values()];
+  return sortThreadsByReceivedAt([...map.values()]);
 }
 
 function hasCompletedInitialSync(account: {
@@ -399,6 +397,12 @@ async function backfillAccountThreads(accountId: string, limit: number) {
 
 async function ensureRelevantAccountsBackfilled(filter: ThreadFilter) {
   if (filter.kind === "sent" || !filter.pageSize || !filter.page) {
+    return;
+  }
+
+  // Search and narrow facet views should stay responsive instead of
+  // draining the remote mailbox to fill one sparse page.
+  if (filter.query || filter.labelId || filter.category) {
     return;
   }
 

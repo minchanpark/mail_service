@@ -5,6 +5,7 @@ BASE_URL="${BASE_URL:-http://localhost:3000}"
 REPORT_DIR="${REPORT_DIR:-.reports/security}"
 RETIRE_PATH="${RETIRE_PATH:-.next}"
 STATUS=0
+AUDIT_SKIP_DEV="${AUDIT_SKIP_DEV:-true}"
 
 mkdir -p "$REPORT_DIR"
 
@@ -13,7 +14,11 @@ if [[ ! -d "$RETIRE_PATH" ]]; then
 fi
 
 echo "[security] audit-ci"
-if ! npx audit-ci --moderate --report-type summary --output-format text | tee "$REPORT_DIR/audit-ci.txt"; then
+AUDIT_ARGS=(--moderate --report-type summary --output-format text)
+if [[ "$AUDIT_SKIP_DEV" == "true" ]]; then
+  AUDIT_ARGS+=(--skip-dev)
+fi
+if ! npx audit-ci "${AUDIT_ARGS[@]}" | tee "$REPORT_DIR/audit-ci.txt"; then
   STATUS=1
 fi
 
