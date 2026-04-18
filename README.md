@@ -88,6 +88,14 @@ npm run perf:memory
 - 로컬 저장소는 데모/개발용입니다. 운영 전환 시 Supabase/Postgres 저장소를 같은 서비스 계층 뒤에 붙이면 됩니다.
 - Outlook은 현재 SMTP/IMAP 비밀번호 기반 구현이라, Microsoft 계정 정책에 따라 Modern Auth/OAuth 전환이 추가로 필요할 수 있습니다.
 
+## Flutter 이관 문서
+
+현재 웹 앱을 기준으로 별도 Flutter 프로젝트를 시작하려면 아래 문서를 참고하면 됩니다.
+
+- `dev/flutter/PRD.md`
+- `dev/flutter/TDD.md`
+- `dev/flutter/DELIVERY_PLAN.md`
+
 ## 보안 관련 환경 변수
 
 ```bash
