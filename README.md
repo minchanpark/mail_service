@@ -54,14 +54,15 @@ npm run perf:memory
 ## 구조
 
 - `src/app` : 화면과 API route
+- `src/models` : 공용 데이터 모델과 직렬화 가능한 계약
 - `src/views/inbox` : 메인 인박스 페이지 UI
 - `src/controllers/inbox` : provider 스타일 페이지 상태관리
 - `src/services/api` : 백엔드 API 매핑 서비스
+- `src/services/client` : 재사용 가능한 저수준 browser hooks/context
+- `src/services/server` : 서버 auth / 비즈니스 로직 / provider / store
+- `src/other/utils` : 순수 유틸리티와 persistence helper
 - `src/components/inbox` : 이전 import를 위한 호환 래퍼
-- `src/lib/client` : 재사용 가능한 저수준 browser hooks/helper
-- `src/lib/server/services` : 비즈니스 로직
-- `src/lib/server/providers` : 메일 provider 드라이버
-- `src/lib/server/store` : 파일 저장소와 시드 데이터
+- `src/lib/**` : 예전 경로를 위한 호환 래퍼
 
 ## 송신 기능
 
@@ -75,15 +76,15 @@ npm run perf:memory
 
 ## provider 확장 방법
 
-1. `src/lib/server/providers/types.ts`의 `MailProviderDriver` 인터페이스를 구현합니다.
-2. 새 driver를 `src/lib/server/providers/registry.ts`에 등록합니다.
+1. `src/services/server/providers/types.ts`의 `MailProviderDriver` 인터페이스를 구현합니다.
+2. 새 driver를 `src/services/server/providers/registry.ts`에 등록합니다.
 3. 필요하면 연결 폼 필드를 `descriptor.fields`에 정의합니다.
 4. `syncInbox()`에서 공통 `Thread` 모델로 정규화해서 반환합니다.
 5. 송신이 필요한 provider는 `sendMail()`도 구현해 SMTP/API 전송을 처리합니다.
 
 ## 참고
 
-- 현재 AI는 규칙 기반 mock 레이어입니다. 추후 Anthropic/OpenAI 호출은 `src/lib/server/services/ai-service.ts` 뒤에 교체하면 됩니다.
+- 현재 AI는 규칙 기반 mock 레이어입니다. 추후 Anthropic/OpenAI 호출은 `src/services/server/services/ai-service.ts` 뒤에 교체하면 됩니다.
 - 로컬 저장소는 데모/개발용입니다. 운영 전환 시 Supabase/Postgres 저장소를 같은 서비스 계층 뒤에 붙이면 됩니다.
 - Outlook은 현재 SMTP/IMAP 비밀번호 기반 구현이라, Microsoft 계정 정책에 따라 Modern Auth/OAuth 전환이 추가로 필요할 수 있습니다.
 

@@ -15,18 +15,17 @@ description: Use when working on the Inbox One / mail_service repository. Covers
 ## Architecture guardrails
 
 - Keep `src/app/api/**` thin. Validate input and delegate to services.
+- Keep shared models and serializable contracts inside `src/models/**`.
 - Keep browser-facing API mapping inside `src/services/api/**`.
+- Keep reusable low-level client hooks and context inside `src/services/client/**`.
+- Keep request auth/session guards, business logic, providers, and persistence inside `src/services/server/**`.
 - Keep page state orchestration inside `src/controllers/**`.
 - Keep page-oriented UI inside `src/views/**`.
-- Keep reusable low-level client hooks inside `src/lib/client/**`.
-- Keep request auth/session guards in `src/lib/server/auth/**`.
-- Keep business logic in `src/lib/server/services/**`.
-- Keep persistence concerns in `src/lib/server/store/**`.
-- Keep provider-specific code in `src/lib/server/providers/**`.
-- Keep shared types and serializable helpers in `src/lib/shared/**`.
+- Keep pure cross-cutting helpers and theme utilities in `src/other/**`.
 - Do not import server modules into client components or client hooks.
 - Do not move provider or persistence logic into route handlers or UI components.
 - Keep draft generation and send orchestration in services, and keep SMTP/API transport details in providers.
+- Treat `src/lib/**` and `src/components/**` as compatibility surfaces unless a task is explicitly about those shims.
 
 ## Typical edit order
 

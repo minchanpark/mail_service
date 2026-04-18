@@ -10,13 +10,13 @@ This file applies to the whole repository.
 4. If you touch `src/**`, read [src/AGENTS.md](./src/AGENTS.md) and then every deeper `AGENTS.md` on the target path before editing.
 
 Example:
-If you edit `src/lib/server/providers/imap/driver.ts`, read:
+If you edit `src/services/server/providers/imap/driver.ts`, read:
 - `AGENTS.md`
 - `src/AGENTS.md`
-- `src/lib/AGENTS.md`
-- `src/lib/server/AGENTS.md`
-- `src/lib/server/providers/AGENTS.md`
-- `src/lib/server/providers/imap/AGENTS.md`
+- `src/services/AGENTS.md`
+- `src/services/server/AGENTS.md`
+- `src/services/server/providers/AGENTS.md`
+- `src/services/server/providers/imap/AGENTS.md`
 
 ## Core rules
 
