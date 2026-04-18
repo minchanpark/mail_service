@@ -292,6 +292,11 @@ export function useUpdateThread() {
   return (threadId: string, patch: Partial<Thread>) => backend.threads.update(threadId, patch);
 }
 
+export function useCreateLabel() {
+  const backend = useMailService();
+  return (payload: Pick<Label, "name" | "color">) => backend.labels.create(payload);
+}
+
 export function useGenerateReply() {
   const backend = useMailService();
   const [state, setState] = useState<{

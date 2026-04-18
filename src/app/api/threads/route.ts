@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { createRouteErrorResponse, requireAuthenticatedUser } from "@/lib/server/auth/session";
 import { listThreads } from "@/lib/server/services/inbox-service";
 import type { Category, ThreadFilter, ThreadView } from "@/lib/shared/types";
 
@@ -27,17 +28,22 @@ function parsePositiveInteger(value: string | null): number | undefined {
 }
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const filter: ThreadFilter = {
-    kind: parseView(searchParams.get("kind")),
-    accountId: searchParams.get("accountId") ?? undefined,
-    category: parseCategory(searchParams.get("category")),
-    labelId: searchParams.get("labelId") ?? undefined,
-    query: searchParams.get("query") ?? undefined,
-    page: parsePositiveInteger(searchParams.get("page")),
-    pageSize: parsePositiveInteger(searchParams.get("pageSize")),
-  };
+  try {
+    const viewer = await requireAuthenticatedUser(request);
+    const { searchParams } = new URL(request.url);
+    const filter: ThreadFilter = {
+      kind: parseView(searchParams.get("kind")),
+      accountId: searchParams.get("accountId") ?? undefined,
+      category: parseCategory(searchParams.get("category")),
+      labelId: searchParams.get("labelId") ?? undefined,
+      query: searchParams.get("query") ?? undefined,
+      page: parsePositiveInteger(searchParams.get("page")),
+      pageSize: parsePositiveInteger(searchParams.get("pageSize")),
+    };
 
-  const result = await listThreads(filter);
-  return NextResponse.json(result);
+    const result = await listThreads(viewer.id, filter);
+    return NextResponse.json(result);
+  } catch (error) {
+    return createRouteErrorResponse(error, "메일 목록을 불러오지 못했습니다.");
+  }
 }

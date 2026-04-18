@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { createRouteErrorResponse, requireAuthenticatedUser } from "@/lib/server/auth/session";
 import { createLabel, listLabels } from "@/lib/server/services/inbox-service";
 
 const labelSchema = z.object({
@@ -8,18 +9,23 @@ const labelSchema = z.object({
   color: z.string().min(4),
 });
 
-export async function GET() {
-  const labels = await listLabels();
-  return NextResponse.json(labels);
+export async function GET(request: Request) {
+  try {
+    const viewer = await requireAuthenticatedUser(request);
+    const labels = await listLabels(viewer.id);
+    return NextResponse.json(labels);
+  } catch (error) {
+    return createRouteErrorResponse(error, "라벨 목록을 불러오지 못했습니다.");
+  }
 }
 
 export async function POST(request: Request) {
   try {
+    const viewer = await requireAuthenticatedUser(request);
     const payload = labelSchema.parse(await request.json());
-    const label = await createLabel(payload);
+    const label = await createLabel(viewer.id, payload);
     return NextResponse.json(label, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "라벨 생성에 실패했습니다.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return createRouteErrorResponse(error, "라벨 생성에 실패했습니다.");
   }
 }

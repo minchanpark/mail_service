@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { createRouteErrorResponse, requireAuthenticatedUser } from "@/lib/server/auth/session";
 import { generateReply } from "@/lib/server/services/inbox-service";
 
 const replySchema = z.object({
@@ -9,11 +10,11 @@ const replySchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    const viewer = await requireAuthenticatedUser(request);
     const payload = replySchema.parse(await request.json());
-    const reply = await generateReply(payload.threadId);
+    const reply = await generateReply(viewer.id, payload.threadId);
     return NextResponse.json(reply);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "답장 초안 생성에 실패했습니다.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return createRouteErrorResponse(error, "답장 초안 생성에 실패했습니다.");
   }
 }

@@ -1,3 +1,5 @@
+import dns from "node:dns/promises";
+import net, { BlockList } from "node:net";
 import { randomUUID } from "node:crypto";
 
 import { ImapFlow } from "imapflow";
@@ -100,6 +102,23 @@ const PRESETS: Record<Exclude<ProviderId, "mock">, ImapPreset> = {
 
 const IMAP_FETCH_BATCH_SIZE = 50;
 const DEFAULT_IMAP_SYNC_LIMIT = 25;
+const privateAddressBlockList = new BlockList();
+
+privateAddressBlockList.addSubnet("0.0.0.0", 8, "ipv4");
+privateAddressBlockList.addSubnet("10.0.0.0", 8, "ipv4");
+privateAddressBlockList.addSubnet("100.64.0.0", 10, "ipv4");
+privateAddressBlockList.addSubnet("127.0.0.0", 8, "ipv4");
+privateAddressBlockList.addSubnet("169.254.0.0", 16, "ipv4");
+privateAddressBlockList.addSubnet("172.16.0.0", 12, "ipv4");
+privateAddressBlockList.addSubnet("192.168.0.0", 16, "ipv4");
+privateAddressBlockList.addSubnet("198.18.0.0", 15, "ipv4");
+privateAddressBlockList.addSubnet("224.0.0.0", 4, "ipv4");
+privateAddressBlockList.addSubnet("::", 128, "ipv6");
+privateAddressBlockList.addSubnet("::1", 128, "ipv6");
+privateAddressBlockList.addSubnet("fc00::", 7, "ipv6");
+privateAddressBlockList.addSubnet("fe80::", 10, "ipv6");
+privateAddressBlockList.addSubnet("ff00::", 8, "ipv6");
+privateAddressBlockList.addSubnet("2001:db8::", 32, "ipv6");
 
 function requireValue(value: string | undefined, label: string) {
   const normalized = value?.trim();
@@ -107,6 +126,85 @@ function requireValue(value: string | undefined, label: string) {
     throw new Error(`${label} 값이 필요합니다.`);
   }
   return normalized;
+}
+
+function normalizeHost(value: string, label: string) {
+  const normalized = requireValue(value, label).toLowerCase().replace(/\.+$/, "");
+  if (!normalized) {
+    throw new Error(`${label} 값이 필요합니다.`);
+  }
+
+  return normalized;
+}
+
+function parsePort(value: string | undefined, label: string) {
+  const normalized = requireValue(value, label);
+  const port = Number.parseInt(normalized, 10);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`${label} 값이 올바르지 않습니다.`);
+  }
+
+  return String(port);
+}
+
+function parseBooleanFlag(value: string | undefined, label: string, fallback: "true" | "false") {
+  const normalized = value?.trim().toLowerCase() || fallback;
+  if (!["true", "false"].includes(normalized)) {
+    throw new Error(`${label} 값은 true 또는 false 여야 합니다.`);
+  }
+
+  return normalized as "true" | "false";
+}
+
+function allowPrivateMailHosts() {
+  return process.env.MAIL_SERVICE_ALLOW_PRIVATE_MAIL_HOSTS === "true";
+}
+
+function isBlockedAddress(address: string, family: 4 | 6) {
+  return privateAddressBlockList.check(address, family === 6 ? "ipv6" : "ipv4");
+}
+
+async function assertSafeRemoteHost(host: string, label: string) {
+  if (allowPrivateMailHosts()) {
+    return;
+  }
+
+  const normalizedHost = normalizeHost(host, label);
+  if (normalizedHost === "localhost" || normalizedHost.endsWith(".local")) {
+    throw new Error(`${label}에는 localhost 또는 사설 네트워크 호스트를 사용할 수 없습니다.`);
+  }
+
+  const literalFamily = net.isIP(normalizedHost);
+  if (literalFamily === 4 || literalFamily === 6) {
+    if (isBlockedAddress(normalizedHost, literalFamily)) {
+      throw new Error(`${label}에는 공용으로 라우팅 가능한 메일 서버만 사용할 수 있습니다.`);
+    }
+    return;
+  }
+
+  const resolved = await dns.lookup(normalizedHost, {
+    all: true,
+    verbatim: true,
+  });
+
+  if (resolved.length === 0) {
+    throw new Error(`${label}를 해석할 수 없습니다.`);
+  }
+
+  for (const entry of resolved) {
+    if (isBlockedAddress(entry.address, entry.family as 4 | 6)) {
+      throw new Error(`${label}에는 공용으로 라우팅 가능한 메일 서버만 사용할 수 있습니다.`);
+    }
+  }
+}
+
+async function assertCustomMailAccountSafety(account: StoredAccount) {
+  if (account.driverId !== "custom-imap") {
+    return;
+  }
+
+  await assertSafeRemoteHost(account.settings?.imapHost ?? "", "IMAP Host");
+  await assertSafeRemoteHost(account.settings?.smtpHost ?? "", "SMTP Host");
 }
 
 function resolveAccountConfig(account: StoredAccount) {
@@ -292,6 +390,7 @@ function normalizeThread(account: StoredAccount, providerMessageId: string, pars
 }
 
 async function fetchImapThreads(account: StoredAccount, options?: SyncInboxOptions) {
+  await assertCustomMailAccountSafety(account);
   const client = new ImapFlow({
     ...resolveAccountConfig(account),
     logger: false,
@@ -378,6 +477,7 @@ async function fetchImapThreads(account: StoredAccount, options?: SyncInboxOptio
 }
 
 async function sendViaSmtp(input: SendMailInput): Promise<SendMailReceipt> {
+  await assertCustomMailAccountSafety(input.account);
   const smtpConfig = resolveSmtpConfig(input.account);
   const transport = nodemailer.createTransport(smtpConfig);
   const from = input.account.label
@@ -499,15 +599,24 @@ export function createImapDriver(providerId: Exclude<ProviderId, "mock">): MailP
 
       const settings =
         providerId === "custom-imap"
-          ? {
-              imapHost: requireValue(input.settings?.imapHost, "IMAP Host"),
-              imapPort: requireValue(input.settings?.imapPort, "IMAP Port"),
-              imapSecure: input.settings?.imapSecure?.trim() || "true",
-              smtpHost: requireValue(input.settings?.smtpHost, "SMTP Host"),
-              smtpPort: requireValue(input.settings?.smtpPort, "SMTP Port"),
-              smtpSecure: input.settings?.smtpSecure?.trim() || "false",
-            }
+          ? (() => {
+              const customSettings = {
+                imapHost: normalizeHost(input.settings?.imapHost ?? "", "IMAP Host"),
+                imapPort: parsePort(input.settings?.imapPort, "IMAP Port"),
+                imapSecure: parseBooleanFlag(input.settings?.imapSecure, "IMAP TLS 사용 여부", "true"),
+                smtpHost: normalizeHost(input.settings?.smtpHost ?? "", "SMTP Host"),
+                smtpPort: parsePort(input.settings?.smtpPort, "SMTP Port"),
+                smtpSecure: parseBooleanFlag(input.settings?.smtpSecure, "SMTP TLS 사용 여부", "false"),
+              };
+
+              return customSettings;
+            })()
           : undefined;
+
+      if (settings) {
+        await assertSafeRemoteHost(settings.imapHost, "IMAP Host");
+        await assertSafeRemoteHost(settings.smtpHost, "SMTP Host");
+      }
 
       return {
         provider: preset.provider,

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { getProviderDriver, listProviderDescriptors } from "@/lib/server/providers/registry";
 import { mutateState, readState } from "@/lib/server/store/file-store";
+import { loadAccountSecrets, storeAccountSecrets } from "@/lib/server/store/secret-store";
 import {
   classifyThread,
   createBriefing,
@@ -15,10 +16,12 @@ import type {
   Briefing,
   ConnectAccountPayload,
   GenerateMailDraftPayload,
+  Label,
   MailDraftVariant,
   ProviderDescriptor,
   SendMailPayload,
   SendMailResult,
+  StoredAccount,
   Thread,
   ThreadFilter,
   ThreadListResponse,
@@ -31,9 +34,10 @@ const REMOTE_BACKFILL_BATCH = 25;
 
 function sanitizeAccount(account: {
   secrets?: Record<string, string>;
+  secretRef?: string;
   settings?: Record<string, string>;
 } & Account): Account {
-  const { secrets: _secrets, settings: _settings, ...publicAccount } = account;
+  const { secrets: _secrets, secretRef: _secretRef, settings: _settings, ...publicAccount } = account;
   return publicAccount;
 }
 
@@ -171,6 +175,68 @@ function normalizeAddresses(addresses: string[] | undefined) {
   return [...new Set(normalized)];
 }
 
+function normalizeLabelName(name: string) {
+  return name.trim().replace(/\s+/g, " ");
+}
+
+function normalizeLabelIds(labelIds: string[] | undefined, labels: Label[]) {
+  const allowedIds = new Set(labels.map((label) => label.id));
+  return [...new Set((labelIds ?? []).filter((labelId) => allowedIds.has(labelId)))];
+}
+
+function ensureViewerMatchesStateUser(viewerUserId: string, state: { user: { id: string } }) {
+  if (state.user.id !== viewerUserId) {
+    throw new Error("사용자를 찾을 수 없습니다.");
+  }
+}
+
+function getUserAccounts(accounts: StoredAccount[], viewerUserId: string) {
+  return accounts.filter((account) => account.userId === viewerUserId);
+}
+
+function getUserThreads(threads: Thread[], viewerUserId: string) {
+  return threads.filter((thread) => thread.userId === viewerUserId);
+}
+
+function getUserLabels(labels: Label[], viewerUserId: string) {
+  return labels.filter((label) => label.userId === viewerUserId);
+}
+
+function requireOwnedAccount(accounts: StoredAccount[], viewerUserId: string, accountId: string) {
+  const account = accounts.find((candidate) => candidate.id === accountId && candidate.userId === viewerUserId);
+  if (!account) {
+    throw new Error("메일 계정을 찾을 수 없습니다.");
+  }
+
+  return account;
+}
+
+function requireOwnedThread(threads: Thread[], viewerUserId: string, threadId: string, message = "메일을 찾을 수 없습니다.") {
+  const thread = threads.find((candidate) => candidate.id === threadId && candidate.userId === viewerUserId);
+  if (!thread) {
+    throw new Error(message);
+  }
+
+  return thread;
+}
+
+function requireOwnedLabel(labels: Label[], viewerUserId: string, labelId: string) {
+  const label = labels.find((candidate) => candidate.id === labelId && candidate.userId === viewerUserId);
+  if (!label) {
+    throw new Error("라벨을 찾을 수 없습니다.");
+  }
+
+  return label;
+}
+
+async function hydrateAccountSecrets<T extends StoredAccount>(account: T) {
+  const secrets = await loadAccountSecrets(account);
+  return {
+    ...account,
+    secrets,
+  };
+}
+
 function ensureOriginalThread(payload: SendMailPayload, thread: Thread | null) {
   if (payload.mode !== "compose" && !thread) {
     throw new Error("원본 메일을 찾을 수 없습니다.");
@@ -244,9 +310,10 @@ export async function getCurrentUser() {
   return state.user;
 }
 
-export async function listAccounts() {
+export async function listAccounts(viewerUserId: string) {
   const state = await readState();
-  return state.accounts.map((account) =>
+  ensureViewerMatchesStateUser(viewerUserId, state);
+  return getUserAccounts(state.accounts, viewerUserId).map((account) =>
     sanitizeAccount({
       ...account,
       unreadCount: recalculateUnreadCounts(state.threads, account.id),
@@ -254,17 +321,29 @@ export async function listAccounts() {
   );
 }
 
-export async function listLabels() {
+export async function listLabels(viewerUserId: string) {
   const state = await readState();
-  return state.labels;
+  ensureViewerMatchesStateUser(viewerUserId, state);
+  return getUserLabels(state.labels, viewerUserId);
 }
 
-export async function createLabel(input: { name: string; color: string }) {
+export async function createLabel(viewerUserId: string, input: { name: string; color: string }) {
   return mutateState((draft) => {
+    ensureViewerMatchesStateUser(viewerUserId, draft);
+    const name = normalizeLabelName(input.name);
+    if (!name) {
+      throw new Error("라벨 이름을 입력해 주세요.");
+    }
+
+    const duplicate = draft.labels.find((label) => label.userId === viewerUserId && label.name.toLowerCase() === name.toLowerCase());
+    if (duplicate) {
+      throw new Error("같은 이름의 라벨이 이미 있습니다.");
+    }
+
     const label = {
       id: randomUUID(),
       userId: draft.user.id,
-      name: input.name,
+      name,
       color: input.color,
     };
     draft.labels.push(label);
@@ -272,25 +351,44 @@ export async function createLabel(input: { name: string; color: string }) {
   });
 }
 
-export async function updateLabel(labelId: string, patch: { name?: string; color?: string }) {
+export async function updateLabel(viewerUserId: string, labelId: string, patch: { name?: string; color?: string }) {
   return mutateState((draft) => {
-    const label = draft.labels.find((candidate) => candidate.id === labelId);
-    if (!label) {
-      throw new Error("라벨을 찾을 수 없습니다.");
+    ensureViewerMatchesStateUser(viewerUserId, draft);
+    const label = requireOwnedLabel(draft.labels, viewerUserId, labelId);
+
+    const nextName = patch.name === undefined ? label.name : normalizeLabelName(patch.name);
+    if (!nextName) {
+      throw new Error("라벨 이름을 입력해 주세요.");
     }
 
-    Object.assign(label, patch);
+    const duplicate = draft.labels.find(
+      (candidate) => candidate.userId === viewerUserId && candidate.id !== labelId && candidate.name.toLowerCase() === nextName.toLowerCase(),
+    );
+    if (duplicate) {
+      throw new Error("같은 이름의 라벨이 이미 있습니다.");
+    }
+
+    Object.assign(label, {
+      ...patch,
+      name: nextName,
+    });
     return label;
   });
 }
 
-export async function removeLabel(labelId: string) {
+export async function removeLabel(viewerUserId: string, labelId: string) {
   return mutateState((draft) => {
-    draft.labels = draft.labels.filter((label) => label.id !== labelId);
-    draft.threads = draft.threads.map((thread) => ({
-      ...thread,
-      labelIds: thread.labelIds.filter((id) => id !== labelId),
-    }));
+    ensureViewerMatchesStateUser(viewerUserId, draft);
+    requireOwnedLabel(draft.labels, viewerUserId, labelId);
+    draft.labels = draft.labels.filter((label) => label.id !== labelId || label.userId !== viewerUserId);
+    draft.threads = draft.threads.map((thread) =>
+      thread.userId !== viewerUserId
+        ? thread
+        : {
+            ...thread,
+            labelIds: thread.labelIds.filter((id) => id !== labelId),
+          },
+    );
   });
 }
 
@@ -298,14 +396,17 @@ export async function listAvailableProviders(): Promise<ProviderDescriptor[]> {
   return listProviderDescriptors();
 }
 
-export async function connectAccount(payload: ConnectAccountPayload) {
+export async function connectAccount(viewerUserId: string, payload: ConnectAccountPayload) {
   const state = await readState();
+  ensureViewerMatchesStateUser(viewerUserId, state);
   const driver = getProviderDriver(payload.driverId);
   const prepared = await driver.prepareAccount(payload);
+  const accountId = randomUUID();
+  const secretRef = await storeAccountSecrets(accountId, prepared.secrets);
 
   const account = {
-    id: randomUUID(),
-    userId: state.user.id,
+    id: accountId,
+    userId: viewerUserId,
     driverId: payload.driverId,
     provider: prepared.provider,
     email: payload.email,
@@ -315,14 +416,20 @@ export async function connectAccount(payload: ConnectAccountPayload) {
     connectedAt: new Date().toISOString(),
     lastSyncedAt: new Date().toISOString(),
     connectionSummary: prepared.connectionSummary,
-    secrets: prepared.secrets,
+    secretRef,
     settings: prepared.settings,
   };
 
-  const syncedThreads = await driver.syncInbox(account, {
-    offset: 0,
-    limit: INITIAL_REMOTE_SYNC_BATCH,
-  });
+  const syncedThreads = await driver.syncInbox(
+    {
+      ...account,
+      secrets: prepared.secrets,
+    },
+    {
+      offset: 0,
+      limit: INITIAL_REMOTE_SYNC_BATCH,
+    },
+  );
   const syncedSettings = buildSyncedSettings(
     account.settings,
     syncedThreads.length,
@@ -330,6 +437,7 @@ export async function connectAccount(payload: ConnectAccountPayload) {
   );
 
   return mutateState((draft) => {
+    ensureViewerMatchesStateUser(viewerUserId, draft);
     draft.accounts.push({
       ...account,
       settings: syncedSettings,
@@ -345,7 +453,7 @@ export async function connectAccount(payload: ConnectAccountPayload) {
   });
 }
 
-async function backfillAccountThreads(accountId: string, limit: number) {
+async function backfillAccountThreads(viewerUserId: string, accountId: string, limit: number) {
   const currentTask = accountBackfillTasks.get(accountId);
   if (currentTask) {
     return currentTask;
@@ -353,7 +461,8 @@ async function backfillAccountThreads(accountId: string, limit: number) {
 
   const task = (async () => {
     const state = await readState();
-    const account = state.accounts.find((candidate) => candidate.id === accountId);
+    ensureViewerMatchesStateUser(viewerUserId, state);
+    const account = state.accounts.find((candidate) => candidate.id === accountId && candidate.userId === viewerUserId);
 
     if (!account || account.driverId === "mock" || account.settings?.hasMoreRemoteMessages === "false") {
       return false;
@@ -362,13 +471,14 @@ async function backfillAccountThreads(accountId: string, limit: number) {
     try {
       const driver = getProviderDriver(account.driverId);
       const offset = getReceivedThreadCount(state.threads, accountId);
-      const syncedThreads = await driver.syncInbox(account, {
+      const syncedThreads = await driver.syncInbox(await hydrateAccountSecrets(account), {
         offset,
         limit,
       });
 
       await mutateState((draft) => {
-        const accountDraft = draft.accounts.find((candidate) => candidate.id === accountId);
+        ensureViewerMatchesStateUser(viewerUserId, draft);
+        const accountDraft = draft.accounts.find((candidate) => candidate.id === accountId && candidate.userId === viewerUserId);
         if (!accountDraft) {
           return;
         }
@@ -395,7 +505,7 @@ async function backfillAccountThreads(accountId: string, limit: number) {
   return task;
 }
 
-async function ensureRelevantAccountsBackfilled(filter: ThreadFilter) {
+async function ensureRelevantAccountsBackfilled(viewerUserId: string, filter: ThreadFilter) {
   if (filter.kind === "sent" || !filter.pageSize || !filter.page) {
     return;
   }
@@ -410,14 +520,15 @@ async function ensureRelevantAccountsBackfilled(filter: ThreadFilter) {
 
   while (true) {
     const state = await readState();
-    const currentCount = applyThreadFilter(state.threads, filter).length;
+    ensureViewerMatchesStateUser(viewerUserId, state);
+    const currentCount = applyThreadFilter(getUserThreads(state.threads, viewerUserId), filter).length;
     if (currentCount >= targetCount) {
       return;
     }
 
     const relevantAccountIds = (filter.accountId
-      ? state.accounts.filter((account) => account.id === filter.accountId)
-      : state.accounts
+      ? getUserAccounts(state.accounts, viewerUserId).filter((account) => account.id === filter.accountId)
+      : getUserAccounts(state.accounts, viewerUserId)
     )
       .filter((account) => account.driverId !== "mock" && account.settings?.hasMoreRemoteMessages !== "false")
       .map((account) => account.id);
@@ -429,13 +540,14 @@ async function ensureRelevantAccountsBackfilled(filter: ThreadFilter) {
     let progressed = false;
 
     for (const accountId of relevantAccountIds) {
-      const didBackfill = await backfillAccountThreads(accountId, REMOTE_BACKFILL_BATCH);
+      const didBackfill = await backfillAccountThreads(viewerUserId, accountId, REMOTE_BACKFILL_BATCH);
       if (didBackfill) {
         progressed = true;
       }
 
       const refreshedState = await readState();
-      const refreshedCount = applyThreadFilter(refreshedState.threads, filter).length;
+      ensureViewerMatchesStateUser(viewerUserId, refreshedState);
+      const refreshedCount = applyThreadFilter(getUserThreads(refreshedState.threads, viewerUserId), filter).length;
       if (refreshedCount >= targetCount) {
         return;
       }
@@ -447,27 +559,32 @@ async function ensureRelevantAccountsBackfilled(filter: ThreadFilter) {
   }
 }
 
-export async function listThreads(filter: ThreadFilter) {
-  await ensureRelevantAccountsBackfilled(filter);
+export async function listThreads(viewerUserId: string, filter: ThreadFilter) {
+  await ensureRelevantAccountsBackfilled(viewerUserId, filter);
   const state = await readState();
-  return paginateThreads(applyThreadFilter(state.threads, filter), filter);
+  ensureViewerMatchesStateUser(viewerUserId, state);
+  return paginateThreads(applyThreadFilter(getUserThreads(state.threads, viewerUserId), filter), filter);
 }
 
-export async function getThread(threadId: string) {
+export async function getThread(viewerUserId: string, threadId: string) {
   const state = await readState();
-  return state.threads.find((thread) => thread.id === threadId) ?? null;
+  ensureViewerMatchesStateUser(viewerUserId, state);
+  return state.threads.find((thread) => thread.id === threadId && thread.userId === viewerUserId) ?? null;
 }
 
-export async function updateThread(threadId: string, patch: Partial<Thread>) {
+export async function updateThread(viewerUserId: string, threadId: string, patch: Partial<Thread>) {
   return mutateState((draft) => {
-    const index = draft.threads.findIndex((thread) => thread.id === threadId);
+    ensureViewerMatchesStateUser(viewerUserId, draft);
+    const index = draft.threads.findIndex((thread) => thread.id === threadId && thread.userId === viewerUserId);
     if (index < 0) {
       throw new Error("메일을 찾을 수 없습니다.");
     }
 
+    const userLabels = getUserLabels(draft.labels, viewerUserId);
     const updated = {
       ...draft.threads[index],
       ...patch,
+      labelIds: patch.labelIds ? normalizeLabelIds(patch.labelIds, userLabels) : draft.threads[index].labelIds,
     };
 
     draft.threads[index] = updated;
@@ -482,12 +599,10 @@ export async function updateThread(threadId: string, patch: Partial<Thread>) {
   });
 }
 
-export async function summarizeThread(threadId: string): Promise<ThreadSummary> {
+export async function summarizeThread(viewerUserId: string, threadId: string): Promise<ThreadSummary> {
   return mutateState((draft) => {
-    const thread = draft.threads.find((candidate) => candidate.id === threadId);
-    if (!thread) {
-      throw new Error("메일을 찾을 수 없습니다.");
-    }
+    ensureViewerMatchesStateUser(viewerUserId, draft);
+    const thread = requireOwnedThread(draft.threads, viewerUserId, threadId);
 
     const summary = generateSummary(thread);
     thread.summary = summary;
@@ -495,8 +610,8 @@ export async function summarizeThread(threadId: string): Promise<ThreadSummary> 
   });
 }
 
-export async function generateReply(threadId: string) {
-  const thread = await getThread(threadId);
+export async function generateReply(viewerUserId: string, threadId: string) {
+  const thread = await getThread(viewerUserId, threadId);
   if (!thread) {
     throw new Error("메일을 찾을 수 없습니다.");
   }
@@ -506,10 +621,14 @@ export async function generateReply(threadId: string) {
   };
 }
 
-export async function generateMailDrafts(payload: GenerateMailDraftPayload): Promise<{ variants: MailDraftVariant[] }> {
+export async function generateMailDrafts(viewerUserId: string, payload: GenerateMailDraftPayload): Promise<{ variants: MailDraftVariant[] }> {
   const state = await readState();
+  ensureViewerMatchesStateUser(viewerUserId, state);
+  if (payload.accountId) {
+    requireOwnedAccount(state.accounts, viewerUserId, payload.accountId);
+  }
   const thread = payload.threadId
-    ? state.threads.find((candidate) => candidate.id === payload.threadId) ?? null
+    ? state.threads.find((candidate) => candidate.id === payload.threadId && candidate.userId === viewerUserId) ?? null
     : null;
 
   if (payload.mode !== "compose" && !thread) {
@@ -527,19 +646,20 @@ export async function generateMailDrafts(payload: GenerateMailDraftPayload): Pro
   };
 }
 
-export async function sendMail(payload: SendMailPayload): Promise<SendMailResult> {
+export async function sendMail(viewerUserId: string, payload: SendMailPayload): Promise<SendMailResult> {
   const state = await readState();
-  const account = state.accounts.find((candidate) => candidate.id === payload.accountId);
-
-  if (!account) {
-    throw new Error("메일 계정을 찾을 수 없습니다.");
-  }
+  ensureViewerMatchesStateUser(viewerUserId, state);
+  const account = requireOwnedAccount(state.accounts, viewerUserId, payload.accountId);
+  const hydratedAccount = await hydrateAccountSecrets(account);
 
   const originalThread = payload.threadId
-    ? state.threads.find((candidate) => candidate.id === payload.threadId) ?? null
+    ? state.threads.find((candidate) => candidate.id === payload.threadId && candidate.userId === viewerUserId) ?? null
     : null;
 
   ensureOriginalThread(payload, originalThread);
+  if (originalThread && payload.mode !== "compose" && originalThread.accountId !== account.id) {
+    throw new Error("원본 메일과 같은 계정으로만 답장 또는 전달할 수 있습니다.");
+  }
 
   const to = normalizeAddresses(payload.to);
   const cc = normalizeAddresses(payload.cc);
@@ -561,7 +681,7 @@ export async function sendMail(payload: SendMailPayload): Promise<SendMailResult
 
   const driver = getProviderDriver(account.driverId);
   const receipt = await driver.sendMail({
-    account,
+    account: hydratedAccount,
     mode: payload.mode,
     originalThread,
     to,
@@ -572,7 +692,7 @@ export async function sendMail(payload: SendMailPayload): Promise<SendMailResult
   });
 
   const sentThread = createSentThread({
-    account,
+    account: hydratedAccount,
     originalThread,
     payload: {
       ...payload,
@@ -588,9 +708,10 @@ export async function sendMail(payload: SendMailPayload): Promise<SendMailResult
   });
 
   return mutateState((draft) => {
+    ensureViewerMatchesStateUser(viewerUserId, draft);
     draft.threads = mergeThreads(draft.threads, [sentThread]);
 
-    const accountDraft = draft.accounts.find((candidate) => candidate.id === account.id);
+    const accountDraft = draft.accounts.find((candidate) => candidate.id === account.id && candidate.userId === viewerUserId);
     if (accountDraft) {
       accountDraft.lastSyncedAt = new Date().toISOString();
       accountDraft.unreadCount = recalculateUnreadCounts(draft.threads, account.id);
@@ -615,7 +736,8 @@ export async function sendMail(payload: SendMailPayload): Promise<SendMailResult
   });
 }
 
-export async function getBriefing(): Promise<Briefing> {
+export async function getBriefing(viewerUserId: string): Promise<Briefing> {
   const state = await readState();
-  return createBriefing(state.threads);
+  ensureViewerMatchesStateUser(viewerUserId, state);
+  return createBriefing(getUserThreads(state.threads, viewerUserId));
 }

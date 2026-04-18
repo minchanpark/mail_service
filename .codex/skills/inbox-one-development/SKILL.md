@@ -19,6 +19,7 @@ description: Use when working on the Inbox One / mail_service repository. Covers
 - Keep page state orchestration inside `src/controllers/**`.
 - Keep page-oriented UI inside `src/views/**`.
 - Keep reusable low-level client hooks inside `src/lib/client/**`.
+- Keep request auth/session guards in `src/lib/server/auth/**`.
 - Keep business logic in `src/lib/server/services/**`.
 - Keep persistence concerns in `src/lib/server/store/**`.
 - Keep provider-specific code in `src/lib/server/providers/**`.
@@ -42,6 +43,9 @@ description: Use when working on the Inbox One / mail_service repository. Covers
 - Run `npm run build`.
 - If the task adds repo-local audit or profiling workflows, keep `.codex/skills/**`, helper scripts, and `package.json` commands aligned.
 - If architecture or workflow changed, update root/subtree `AGENTS.md`, `.codex/hooks.json`, and the relevant project skill.
+- When work touches package/config security surfaces, use `web-security-audit`.
+- When work touches route validation, provider trust boundaries, secret handling, or send safety, use `inbox-one-security-review`.
+- When work touches AI summary/reply/draft flows, use `inbox-one-llm-safety`.
 
 ## When adding new directories
 

@@ -43,6 +43,7 @@ export interface Account {
 
 export interface StoredAccount extends Account {
   secrets?: Record<string, string>;
+  secretRef?: string;
   settings?: Record<string, string>;
 }
 

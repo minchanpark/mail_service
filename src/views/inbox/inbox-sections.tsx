@@ -5,6 +5,7 @@ import {
   Archive,
   Bell,
   CalendarDays,
+  Check,
   ChevronRight,
   Clock,
   Forward,
@@ -75,6 +76,15 @@ const FILTER_TABS: Array<{ value: ThreadView; label: string }> = [
   { value: "needsReply", label: "답장 필요" },
   { value: "starred", label: "별표" },
   { value: "sent", label: "보낸 메일" },
+];
+
+const LABEL_COLOR_OPTIONS = [
+  "#2563eb",
+  "#0f766e",
+  "#7c3aed",
+  "#db2777",
+  "#ea580c",
+  "#65a30d",
 ];
 
 export function Sidebar() {
@@ -310,6 +320,10 @@ export function DetailPane() {
   const updateThread = useUpdateThread();
   const summarizeThread = useSummarizeThread();
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [labelName, setLabelName] = useState("");
+  const [labelColor, setLabelColor] = useState(LABEL_COLOR_OPTIONS[0]);
+  const [labelBusy, setLabelBusy] = useState(false);
+  const [labelError, setLabelError] = useState<string | null>(null);
 
   if (!controller.selectedThreadId) {
     return <EmptyState icon={<ChevronRight size={18} />} title="왼쪽에서 메일을 선택하세요." />;
@@ -326,6 +340,7 @@ export function DetailPane() {
   const account = controller.accounts.find((candidate) => candidate.id === thread.accountId);
   const threadLabels = controller.labels.filter((label) => thread.labelIds.includes(label.id));
   const isSent = thread.direction === "sent";
+  const assignedLabelIds = new Set(thread.labelIds);
 
   return (
     <section className="scrollbar" style={{ overflow: "auto", background: "var(--bg-1)", minWidth: 0 }}>
@@ -443,6 +458,170 @@ export function DetailPane() {
           <ActionButton icon={<CalendarDays size={14} />} label="일정 등록 예정" />
           <ActionButton icon={<ListTodo size={14} />} label="할일 추가 예정" />
           <ActionButton icon={<Trash2 size={14} />} label="삭제 예정" />
+        </div>
+
+        <div
+          style={{
+            border: "1px solid var(--border)",
+            borderRadius: 18,
+            background: "var(--bg-0)",
+            padding: 18,
+            marginBottom: 18,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+            <Tag size={14} />
+            <strong style={{ fontSize: 14 }}>라벨 관리</strong>
+            <div style={{ fontSize: 12, color: "var(--fg-2)" }}>메일에 라벨을 바로 추가하거나 해제할 수 있습니다.</div>
+          </div>
+
+          {controller.labels.length > 0 ? (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {controller.labels.map((label) => {
+                const assigned = assignedLabelIds.has(label.id);
+
+                return (
+                  <button
+                    key={label.id}
+                    onClick={async () => {
+                      setLabelBusy(true);
+                      setLabelError(null);
+
+                      try {
+                        const nextLabelIds = assigned
+                          ? thread.labelIds.filter((labelId) => labelId !== label.id)
+                          : [...thread.labelIds, label.id];
+                        await controller.saveThreadLabels(thread.id, nextLabelIds);
+                      } catch (saveError) {
+                        setLabelError(saveError instanceof Error ? saveError.message : "라벨을 저장하지 못했습니다.");
+                      } finally {
+                        setLabelBusy(false);
+                      }
+                    }}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "8px 12px",
+                      borderRadius: 999,
+                      border: assigned ? `1px solid ${label.color}` : "1px solid var(--border)",
+                      background: assigned ? `${label.color}18` : "var(--bg-1)",
+                      color: assigned ? label.color : "var(--fg-1)",
+                      cursor: labelBusy ? "wait" : "pointer",
+                      fontWeight: 600,
+                      opacity: labelBusy ? 0.7 : 1,
+                    }}
+                    disabled={labelBusy}
+                  >
+                    <span
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 999,
+                        background: label.color,
+                        display: "inline-block",
+                      }}
+                    />
+                    {label.name}
+                    {assigned ? <Check size={14} /> : null}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <EmptyState icon={<Tag size={16} />} title="아직 만든 라벨이 없습니다." compact />
+          )}
+
+          <div
+            style={{
+              marginTop: 18,
+              paddingTop: 18,
+              borderTop: "1px solid var(--border)",
+              display: "grid",
+              gap: 14,
+            }}
+          >
+            <Field label="새 라벨 이름">
+              <input
+                value={labelName}
+                onChange={(event) => setLabelName(event.target.value)}
+                placeholder="예: 계약, 학교, 중요 고객"
+                style={inputStyle()}
+              />
+            </Field>
+
+            <div style={{ display: "grid", gap: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>색상</div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {LABEL_COLOR_OPTIONS.map((color) => {
+                  const active = color === labelColor;
+
+                  return (
+                    <button
+                      key={color}
+                      onClick={() => setLabelColor(color)}
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 999,
+                        border: active ? "2px solid var(--fg-0)" : "1px solid var(--border)",
+                        background: color,
+                        color: "#fff",
+                        display: "grid",
+                        placeItems: "center",
+                        cursor: "pointer",
+                      }}
+                      aria-label={`라벨 색상 ${color}`}
+                    >
+                      {active ? <Check size={14} /> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {labelError ? (
+              <div
+                style={{
+                  padding: "12px 14px",
+                  borderRadius: 14,
+                  background: "rgba(220, 38, 38, 0.08)",
+                  color: "var(--danger)",
+                  fontSize: 13,
+                }}
+              >
+                {labelError}
+              </div>
+            ) : null}
+
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={async () => {
+                  setLabelBusy(true);
+                  setLabelError(null);
+
+                  try {
+                    const createdLabel = await controller.createLabel({
+                      name: labelName,
+                      color: labelColor,
+                    });
+                    await controller.saveThreadLabels(thread.id, [...thread.labelIds, createdLabel.id]);
+                    setLabelName("");
+                    setLabelColor(LABEL_COLOR_OPTIONS[0]);
+                  } catch (createError) {
+                    setLabelError(createError instanceof Error ? createError.message : "라벨을 생성하지 못했습니다.");
+                  } finally {
+                    setLabelBusy(false);
+                  }
+                }}
+                style={{ ...primaryButtonStyle(), width: "auto" }}
+                disabled={labelBusy}
+              >
+                {labelBusy ? <Loader2 size={14} className="spin" /> : <Plus size={14} />}
+                새 라벨 만들고 이 메일에 적용
+              </button>
+            </div>
+          </div>
         </div>
 
         <article

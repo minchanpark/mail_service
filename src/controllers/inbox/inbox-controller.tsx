@@ -11,7 +11,15 @@ import {
   type ReactNode,
 } from "react";
 
-import { useAccounts, useBriefing, useCurrentUser, useLabels, useThreads } from "@/lib/client/hooks";
+import {
+  useAccounts,
+  useBriefing,
+  useCreateLabel,
+  useCurrentUser,
+  useLabels,
+  useThreads,
+  useUpdateThread,
+} from "@/lib/client/hooks";
 import type {
   Account,
   Briefing,
@@ -59,6 +67,8 @@ type InboxControllerValue = {
   threadsTotal: number;
   threadsError: string | null;
   loadMoreThreads: () => void;
+  createLabel: (input: Pick<Label, "name" | "color">) => Promise<Label>;
+  saveThreadLabels: (threadId: string, labelIds: string[]) => Promise<Thread>;
 };
 
 const mailApiService = createMailApiService();
@@ -93,6 +103,8 @@ function InboxControllerStateProvider({ children }: { children: ReactNode }) {
   const { data: accounts } = useAccounts();
   const { data: labels } = useLabels();
   const { data: briefing } = useBriefing();
+  const createLabel = useCreateLabel();
+  const updateThread = useUpdateThread();
   const {
     data: threads,
     loading: threadsLoading,
@@ -173,6 +185,10 @@ function InboxControllerStateProvider({ children }: { children: ReactNode }) {
     threadsTotal,
     threadsError,
     loadMoreThreads,
+    createLabel,
+    saveThreadLabels(threadId, labelIds) {
+      return updateThread(threadId, { labelIds });
+    },
   };
 
   return <InboxControllerContext.Provider value={value}>{children}</InboxControllerContext.Provider>;

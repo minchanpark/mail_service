@@ -11,9 +11,18 @@ npm run dev
 
 기본 주소: `http://localhost:3000`
 
+기본 보안 동작:
+
+- 앱과 API는 기본적으로 `localhost`에서만 열립니다.
+- 다른 기기나 LAN 주소로 열려면 `MAIL_SERVICE_ALLOW_REMOTE_ACCESS=true`를 명시적으로 켜야 합니다.
+- 메일 계정 비밀번호/앱 비밀번호는 로컬 JSON 저장소가 아니라 macOS Keychain에 저장됩니다.
+- `custom-imap`은 기본적으로 공용으로 라우팅 가능한 IMAP/SMTP 호스트만 허용합니다.
+
 ## 진단 스킬과 툴링
 
 - 보안 점검: `audit-ci`, `retire`, `.codex/skills/web-security-audit`
+- 애플리케이션/비즈니스 로직 보안 리뷰: `.codex/skills/inbox-one-security-review`
+- LLM/프롬프트 안전성 리뷰: `.codex/skills/inbox-one-llm-safety`
 - 네트워크 성능 점검: `autocannon`, `.codex/skills/web-network-performance`
 - 메모리 점검: `clinic`, `.codex/skills/web-memory-profile`
 - 메모리 점검은 기본적으로 Node `--heap-prof` + `autocannon`을 사용하고, 필요 시 `clinic`을 보조로 사용합니다.
@@ -77,3 +86,21 @@ npm run perf:memory
 - 현재 AI는 규칙 기반 mock 레이어입니다. 추후 Anthropic/OpenAI 호출은 `src/lib/server/services/ai-service.ts` 뒤에 교체하면 됩니다.
 - 로컬 저장소는 데모/개발용입니다. 운영 전환 시 Supabase/Postgres 저장소를 같은 서비스 계층 뒤에 붙이면 됩니다.
 - Outlook은 현재 SMTP/IMAP 비밀번호 기반 구현이라, Microsoft 계정 정책에 따라 Modern Auth/OAuth 전환이 추가로 필요할 수 있습니다.
+
+## 보안 관련 환경 변수
+
+```bash
+MAIL_SERVICE_ALLOW_REMOTE_ACCESS=false
+MAIL_SERVICE_SESSION_SECRET=
+MAIL_SERVICE_ALLOW_PRIVATE_MAIL_HOSTS=false
+MAIL_SERVICE_ALLOW_INSECURE_FILE_SECRETS=false
+```
+
+- `MAIL_SERVICE_ALLOW_REMOTE_ACCESS`
+  - 기본값은 `false`입니다. `true`일 때만 `localhost` 외 주소에서 앱을 엽니다.
+- `MAIL_SERVICE_SESSION_SECRET`
+  - 데모 세션 서명용 비밀값입니다. 로컬 기본값이 있지만, 원격 접속을 열 경우 직접 설정하는 편이 안전합니다.
+- `MAIL_SERVICE_ALLOW_PRIVATE_MAIL_HOSTS`
+  - 기본값은 `false`입니다. `custom-imap`에서 사설망/loopback 호스트를 꼭 써야 할 때만 `true`로 여세요.
+- `MAIL_SERVICE_ALLOW_INSECURE_FILE_SECRETS`
+  - macOS Keychain이 없는 환경에서만 예외적으로 파일 기반 secret 저장을 허용합니다. 기본값 `false`를 유지하는 편이 안전합니다.

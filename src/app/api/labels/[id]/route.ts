@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { createRouteErrorResponse, requireAuthenticatedUser } from "@/lib/server/auth/session";
 import { removeLabel, updateLabel } from "@/lib/server/services/inbox-service";
 
 const updateLabelSchema = z.object({
@@ -16,23 +17,23 @@ type RouteContext = {
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
+    const viewer = await requireAuthenticatedUser(request);
     const { id } = await context.params;
     const payload = updateLabelSchema.parse(await request.json());
-    const label = await updateLabel(id, payload);
+    const label = await updateLabel(viewer.id, id, payload);
     return NextResponse.json(label);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "라벨 수정에 실패했습니다.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return createRouteErrorResponse(error, "라벨 수정에 실패했습니다.");
   }
 }
 
-export async function DELETE(_: Request, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
   try {
+    const viewer = await requireAuthenticatedUser(request);
     const { id } = await context.params;
-    await removeLabel(id);
+    await removeLabel(viewer.id, id);
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "라벨 삭제에 실패했습니다.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return createRouteErrorResponse(error, "라벨 삭제에 실패했습니다.");
   }
 }

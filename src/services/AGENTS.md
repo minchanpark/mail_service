@@ -4,7 +4,8 @@ This file applies to `src/services/`.
 
 ## Rules
 
-- This subtree owns browser-facing service definitions and API mapping.
-- Keep service files focused on transport, request building, invalidation, and dependency injection.
-- Do not import server-only modules here.
-- Controllers may depend on services; services must not depend on page views.
+- This subtree owns the non-UI service layer.
+- `api/` maps backend endpoints for the browser.
+- `client/` owns low-level browser hooks, context, and client-side dependency injection.
+- `server/` owns server-only auth, business logic, providers, and persistence helpers.
+- Keep each deeper subtree focused on its role and read the nearest `AGENTS.md` before editing there.

@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { compactAppStateForStorage, sortThreadsByReceivedAt } from "@/lib/shared/thread-persistence";
 import { createSeedState } from "@/lib/server/store/seed";
+import { migrateLegacyStateSecrets } from "@/lib/server/store/secret-store";
 import type { AppState } from "@/lib/shared/types";
 
 const dataPath = path.join(/* turbopackIgnore: true */ process.cwd(), "data", "mail-service-db.json");
@@ -48,20 +49,29 @@ async function loadStateFromDisk() {
       ...parsedState,
       threads: sortThreadsByReceivedAt(parsedState.threads),
     };
-    await writeAtomically(backupPath, JSON.stringify(normalizedState, null, 2));
-    cachedState = normalizedState;
-    return normalizedState;
+    const migrated = await migrateLegacyStateSecrets(normalizedState);
+    const finalState = migrated.state;
+    const serialized = JSON.stringify(finalState, null, 2);
+    await writeAtomically(backupPath, serialized);
+    if (migrated.changed) {
+      await writeAtomically(dataPath, serialized);
+    }
+    cachedState = finalState;
+    return finalState;
   } catch (error) {
     const recoveredState = await readStateFromFile(backupPath);
     const normalizedState = {
       ...recoveredState,
       threads: sortThreadsByReceivedAt(recoveredState.threads),
     };
-    const serializedRecoveredState = JSON.stringify(normalizedState, null, 2);
+    const migrated = await migrateLegacyStateSecrets(normalizedState);
+    const finalState = migrated.state;
+    const serializedRecoveredState = JSON.stringify(finalState, null, 2);
     await writeAtomically(dataPath, serializedRecoveredState);
-    cachedState = normalizedState;
+    await writeAtomically(backupPath, serializedRecoveredState);
+    cachedState = finalState;
     console.warn("[mail-service] recovered state from backup after primary store read failed", error);
-    return normalizedState;
+    return finalState;
   }
 }
 

@@ -4,7 +4,8 @@ This file applies to `src/lib/`.
 
 ## Rules
 
-- `client/` is browser-only.
-- `server/` is server-only.
-- `shared/` is pure and safe for both sides.
-- Keep imports moving inward, not across client/server boundaries.
+- Treat this subtree as compatibility wrappers for older imports while the primary implementation lives in `src/models/**`, `src/services/**`, and `src/other/**`.
+- `client/` wrappers must stay browser-safe.
+- `server/` wrappers must stay server-only.
+- `shared/` wrappers must stay pure and safe for both sides.
+- Keep wrappers thin and avoid reintroducing business logic here.

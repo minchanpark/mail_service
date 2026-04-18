@@ -1,5 +1,8 @@
+import { connection } from "next/server";
+
 import { InboxPage } from "@/views/inbox/inbox-page";
 
-export default function HomePage() {
+export default async function HomePage() {
+  await connection();
   return <InboxPage />;
 }

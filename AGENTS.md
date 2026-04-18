@@ -21,18 +21,21 @@ If you edit `src/lib/server/providers/imap/driver.ts`, read:
 ## Core rules
 
 - Keep App Router route handlers thin in `src/app/api/**`.
+- Keep shared contracts and serializable data models in `src/models/**`.
 - Keep browser API mapping in `src/services/api/**`.
+- Keep low-level browser hooks and reusable client helpers in `src/services/client/**`.
+- Keep request auth/session helpers in `src/services/server/auth/**`.
+- Keep business logic in `src/services/server/**`.
+- Keep provider-specific integration in `src/services/server/providers/**`.
+- Keep persistence in `src/services/server/store/**`.
 - Keep page state orchestration in `src/controllers/**`.
 - Keep page-oriented UI in `src/views/**`.
-- Keep low-level browser hooks and reusable client helpers in `src/lib/client/**`.
-- Keep business logic in `src/lib/server/services/**`.
-- Keep provider-specific integration in `src/lib/server/providers/**`.
-- Keep persistence in `src/lib/server/store/**`.
-- Keep shared contracts and serializable helpers in `src/lib/shared/**`.
+- Keep cross-cutting pure utilities and theme helpers in `src/other/**`.
 - Do not import server modules into client code.
 - Do not move provider logic into routes or components.
 - Preserve the provider registry/driver pattern when adding new mail servers.
 - Keep the file-backed demo store working unless the task explicitly replaces it.
+- Treat `src/lib/**` and `src/components/**` as compatibility surfaces unless a task explicitly restores them as primary implementation layers.
 - When touching `src/views/**`, also read the matching controller and service `AGENTS.md` on that page path if they exist.
 
 ## Documentation rules
@@ -47,6 +50,9 @@ If you edit `src/lib/server/providers/imap/driver.ts`, read:
 - Project skills live in `.codex/skills/**`.
 - Project hooks are registered in `.codex/hooks.json` and implemented in `.codex/hooks/**`.
 - Tool-backed quality skills should keep their required npm packages and runnable scripts in sync with `package.json`.
+- For horizontal security changes such as `package.json`, `package-lock.json`, `next.config.*`, `proxy.ts`, or `middleware.ts`, use `web-security-audit`.
+- For app-layer security review such as auth, provider trust boundaries, secret handling, and send safety, use `inbox-one-security-review`.
+- For AI summary/draft/reply guardrails and prompt-boundary review, use `inbox-one-llm-safety`.
 
 ## Validation
 

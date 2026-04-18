@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { createRouteErrorResponse, requireAuthenticatedUser } from "@/lib/server/auth/session";
 import { connectAccount } from "@/lib/server/services/inbox-service";
 
 const connectAccountSchema = z.object({
@@ -13,11 +14,11 @@ const connectAccountSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    const viewer = await requireAuthenticatedUser(request);
     const payload = connectAccountSchema.parse(await request.json());
-    const account = await connectAccount(payload);
+    const account = await connectAccount(viewer.id, payload);
     return NextResponse.json(account, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "계정 연결에 실패했습니다.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return createRouteErrorResponse(error, "계정 연결에 실패했습니다.");
   }
 }

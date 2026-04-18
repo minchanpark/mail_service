@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 
+import { createRouteErrorResponse, requireAuthenticatedUser } from "@/lib/server/auth/session";
 import { getBriefing } from "@/lib/server/services/inbox-service";
 
-export async function GET() {
-  const briefing = await getBriefing();
-  return NextResponse.json(briefing);
+export async function GET(request: Request) {
+  try {
+    const viewer = await requireAuthenticatedUser(request);
+    const briefing = await getBriefing(viewer.id);
+    return NextResponse.json(briefing);
+  } catch (error) {
+    return createRouteErrorResponse(error, "브리핑을 불러오지 못했습니다.");
+  }
 }
