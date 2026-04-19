@@ -1,10 +1,8 @@
 import { createImapDriver } from "@/services/server/providers/imap/driver";
-import { mockProviderDriver } from "@/services/server/providers/mock";
 import type { MailProviderDriver } from "@/services/server/providers/types";
 import type { ProviderId } from "@/models";
 
 const drivers = new Map<ProviderId, MailProviderDriver>([
-  ["mock", mockProviderDriver],
   ["gmail", createImapDriver("gmail")],
   ["outlook", createImapDriver("outlook")],
   ["naver", createImapDriver("naver")],

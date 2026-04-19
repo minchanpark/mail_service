@@ -5,7 +5,7 @@ import { createRouteErrorResponse, requireAuthenticatedUser } from "@/services/s
 import { connectAccount } from "@/services/server/services/inbox-service";
 
 const connectAccountSchema = z.object({
-  driverId: z.enum(["mock", "gmail", "outlook", "naver", "custom-imap"]),
+  driverId: z.enum(["gmail", "outlook", "naver", "custom-imap"]),
   email: z.string().email(),
   label: z.string().optional(),
   secrets: z.record(z.string(), z.string()).optional(),

@@ -55,7 +55,7 @@ type AddressLike =
       value?: AddressEntry[];
     }>;
 
-const PRESETS: Record<Exclude<ProviderId, "mock">, ImapPreset> = {
+const PRESETS: Record<ProviderId, ImapPreset> = {
   gmail: {
     provider: "gmail",
     label: "Gmail",
@@ -208,7 +208,7 @@ async function assertCustomMailAccountSafety(account: StoredAccount) {
 }
 
 function resolveAccountConfig(account: StoredAccount) {
-  const preset = PRESETS[account.driverId as Exclude<ProviderId, "mock">];
+  const preset = PRESETS[account.driverId];
   const host = account.settings?.imapHost ?? preset.host;
   const secureRaw = account.settings?.imapSecure;
   const secure = secureRaw ? secureRaw === "true" : preset.secure ?? true;
@@ -227,7 +227,7 @@ function resolveAccountConfig(account: StoredAccount) {
 }
 
 function resolveSmtpConfig(account: StoredAccount) {
-  const preset = PRESETS[account.driverId as Exclude<ProviderId, "mock">];
+  const preset = PRESETS[account.driverId];
   const host = account.settings?.smtpHost ?? preset.smtpHost;
   const secureRaw = account.settings?.smtpSecure;
   const secure = secureRaw ? secureRaw === "true" : preset.smtpSecure ?? true;
@@ -260,7 +260,7 @@ function readErrorText(error: unknown) {
     .trim();
 }
 
-function mapImapProviderError(providerId: Exclude<ProviderId, "mock">, error: unknown, context: ErrorContext) {
+function mapImapProviderError(providerId: ProviderId, error: unknown, context: ErrorContext) {
   if (!(error instanceof Error)) {
     return new Error("메일 서버 연결에 실패했습니다.");
   }
@@ -464,7 +464,7 @@ async function fetchImapThreads(account: StoredAccount, options?: SyncInboxOptio
 
     return threads.sort((a, b) => +new Date(b.receivedAt) - +new Date(a.receivedAt));
   } catch (error) {
-    throw mapImapProviderError(account.driverId as Exclude<ProviderId, "mock">, error, "imap-sync");
+    throw mapImapProviderError(account.driverId, error, "imap-sync");
   } finally {
     if (lock) {
       lock.release();
@@ -501,7 +501,7 @@ async function sendViaSmtp(input: SendMailInput): Promise<SendMailReceipt> {
           : undefined,
     });
   } catch (error) {
-    throw mapImapProviderError(input.account.driverId as Exclude<ProviderId, "mock">, error, "smtp-send");
+    throw mapImapProviderError(input.account.driverId, error, "smtp-send");
   }
 
   return {
@@ -512,7 +512,7 @@ async function sendViaSmtp(input: SendMailInput): Promise<SendMailReceipt> {
   };
 }
 
-export function createImapDriver(providerId: Exclude<ProviderId, "mock">): MailProviderDriver {
+export function createImapDriver(providerId: ProviderId): MailProviderDriver {
   const preset = PRESETS[providerId];
 
   return {

@@ -676,7 +676,7 @@ export function DetailPane() {
 export function ConnectAccountSheet({ onClose }: { onClose: () => void }) {
   const mailService = useMailService();
   const { data: providers, loading } = useProviderCatalog();
-  const [selectedProviderId, setSelectedProviderId] = useState<string>("mock");
+  const [selectedProviderId, setSelectedProviderId] = useState<string>("");
   const [email, setEmail] = useState("");
   const [label, setLabel] = useState("");
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
@@ -684,6 +684,17 @@ export function ConnectAccountSheet({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
 
   const selectedProvider = providers?.find((provider) => provider.id === selectedProviderId) ?? providers?.[0];
+
+  useEffect(() => {
+    if (!providers?.length) {
+      return;
+    }
+
+    const hasSelectedProvider = providers.some((provider) => provider.id === selectedProviderId);
+    if (!hasSelectedProvider) {
+      setSelectedProviderId(providers[0].id);
+    }
+  }, [providers, selectedProviderId]);
 
   useEffect(() => {
     if (!selectedProvider) {
@@ -930,7 +941,7 @@ function ThreadRow({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <ProviderDot provider={account?.provider ?? "mock"} />
+          <ProviderDot provider={account?.provider ?? "custom-imap"} />
           <div style={{ minWidth: 0 }}>
             <div
               style={{

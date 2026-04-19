@@ -45,7 +45,6 @@ npm run perf:memory
 - 실제 메일 송신 지원 (`새 메일`, `답장`, `전달`, `CC/BCC`, `보낸 메일`)
 - IMAP 계정의 원격 메일함 백필 페이지네이션
 - 지원 provider
-  - `mock`
   - `gmail` (IMAP/SMTP + 앱 비밀번호)
   - `outlook` (IMAP/SMTP)
   - `naver` (IMAP/SMTP + 앱 비밀번호)
@@ -84,7 +83,7 @@ npm run perf:memory
 
 ## 참고
 
-- 현재 AI는 규칙 기반 mock 레이어입니다. 추후 Anthropic/OpenAI 호출은 `src/services/server/services/ai-service.ts` 뒤에 교체하면 됩니다.
+- 현재 AI는 규칙 기반 로컬 레이어입니다. 추후 Anthropic/OpenAI 호출은 `src/services/server/services/ai-service.ts` 뒤에 교체하면 됩니다.
 - 로컬 저장소는 데모/개발용입니다. 운영 전환 시 Supabase/Postgres 저장소를 같은 서비스 계층 뒤에 붙이면 됩니다.
 - Outlook은 현재 SMTP/IMAP 비밀번호 기반 구현이라, Microsoft 계정 정책에 따라 Modern Auth/OAuth 전환이 추가로 필요할 수 있습니다.
 

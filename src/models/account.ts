@@ -1,5 +1,5 @@
-export type ProviderId = "mock" | "gmail" | "outlook" | "naver" | "custom-imap";
-export type AccountProvider = "gmail" | "outlook" | "naver" | "custom-imap" | "mock";
+export type ProviderId = "gmail" | "outlook" | "naver" | "custom-imap";
+export type AccountProvider = "gmail" | "outlook" | "naver" | "custom-imap";
 export type AccountStatus = "active" | "reauth_needed" | "disconnected";
 
 export interface User {

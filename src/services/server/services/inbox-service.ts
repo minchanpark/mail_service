@@ -143,13 +143,6 @@ function mergeThreads(current: Thread[], incoming: Thread[]) {
   return sortThreadsByReceivedAt([...map.values()]);
 }
 
-function hasCompletedInitialSync(account: {
-  driverId: Account["driverId"];
-  settings?: Record<string, string>;
-}) {
-  return account.driverId === "mock" || account.settings?.initialSyncComplete === "true";
-}
-
 function buildSyncedSettings(
   settings: Record<string, string> | undefined,
   syncedCount: number,
@@ -464,7 +457,7 @@ async function backfillAccountThreads(viewerUserId: string, accountId: string, l
     ensureViewerMatchesStateUser(viewerUserId, state);
     const account = state.accounts.find((candidate) => candidate.id === accountId && candidate.userId === viewerUserId);
 
-    if (!account || account.driverId === "mock" || account.settings?.hasMoreRemoteMessages === "false") {
+    if (!account || account.settings?.hasMoreRemoteMessages === "false") {
       return false;
     }
 
@@ -530,7 +523,7 @@ async function ensureRelevantAccountsBackfilled(viewerUserId: string, filter: Th
       ? getUserAccounts(state.accounts, viewerUserId).filter((account) => account.id === filter.accountId)
       : getUserAccounts(state.accounts, viewerUserId)
     )
-      .filter((account) => account.driverId !== "mock" && account.settings?.hasMoreRemoteMessages !== "false")
+      .filter((account) => account.settings?.hasMoreRemoteMessages !== "false")
       .map((account) => account.id);
 
     if (relevantAccountIds.length === 0) {
